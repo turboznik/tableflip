@@ -12,6 +12,10 @@ export default defineConfig({
       "@": resolve(import.meta.dirname, "./src"),
     },
   },
+  build: {
+    // React and Base UI make up most of the bundle; it's about 175 kB gzipped.
+    chunkSizeWarningLimit: 600,
+  },
   test: {
     include: ["src/**/*.test.ts"],
     environment: "node",

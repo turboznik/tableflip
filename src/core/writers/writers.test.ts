@@ -323,7 +323,7 @@ describe("Typst", () => {
 describe("writeTable", () => {
   it("writes every format", () => {
     for (const { id } of OUTPUT_FORMATS) {
-      expect(writeTable(instruments, id, DEFAULT_OPTIONS).length).toBeGreaterThan(0)
+      expect(writeTable(instruments, id, DEFAULT_OPTIONS[id]).length).toBeGreaterThan(0)
     }
   })
 
@@ -334,7 +334,7 @@ describe("writeTable", () => {
     const big = view(rows)
     for (const { id } of OUTPUT_FORMATS) {
       const start = performance.now()
-      writeTable(big, id, DEFAULT_OPTIONS)
+      writeTable(big, id, DEFAULT_OPTIONS[id])
       expect(performance.now() - start, id).toBeLessThan(1500)
     }
   })

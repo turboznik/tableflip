@@ -58,32 +58,30 @@ export const DEFAULT_OPTIONS: OutputOptions = {
   typst: {},
 }
 
-/** Writes the table in the given format, using that format's options. */
-export function writeTable(
+const WRITERS: {
+  [F in OutputFormat]: (view: TableView, options: OutputOptions[F]) => string
+} = {
+  excel: (view) => writeExcelText(view),
+  csv: writeCsv,
+  html: writeHtml,
+  markdown: writeMarkdown,
+  json: writeJson,
+  jsonl: writeJsonLines,
+  ascii: writeAscii,
+  dax: writeDax,
+  pandas: writePandas,
+  typst: (view) => writeTypst(view),
+}
+
+/** Writes the table in one format, with that format's options. */
+export function writeTable<F extends OutputFormat>(
   view: TableView,
-  format: OutputFormat,
-  options: OutputOptions
+  format: F,
+  options: OutputOptions[F]
 ): string {
-  switch (format) {
-    case "excel":
-      return writeExcelText(view)
-    case "csv":
-      return writeCsv(view, options.csv)
-    case "html":
-      return writeHtml(view, options.html)
-    case "markdown":
-      return writeMarkdown(view, options.markdown)
-    case "json":
-      return writeJson(view, options.json)
-    case "jsonl":
-      return writeJsonLines(view, options.jsonl)
-    case "ascii":
-      return writeAscii(view, options.ascii)
-    case "dax":
-      return writeDax(view, options.dax)
-    case "pandas":
-      return writePandas(view, options.pandas)
-    case "typst":
-      return writeTypst(view)
-  }
+  const write = WRITERS[format] as (
+    view: TableView,
+    options: OutputOptions[F]
+  ) => string
+  return write(view, options)
 }
