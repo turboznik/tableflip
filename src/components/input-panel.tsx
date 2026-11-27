@@ -67,7 +67,7 @@ export function InputPanel({
   const formatLabel = result && INPUT_FORMATS.find((f) => f.id === result.format)?.label
 
   return (
-    <Panel aria-label="Input" className="min-h-72">
+    <Panel aria-label="Input" className="min-h-72 lg:min-h-0">
       <PanelHeader>
         <PanelTitle>Input</PanelTitle>
         <Select
@@ -119,7 +119,7 @@ export function InputPanel({
         </ErrorMessage>
       )}
 
-      <div className="relative flex min-h-40 flex-1 flex-col">
+      <div className="relative flex min-h-40 flex-1 flex-col lg:min-h-16">
         <textarea
           ref={textareaRef}
           // Not controlled by React: rewriting megabytes of text on every keystroke made typing lag.

@@ -255,7 +255,7 @@ export function App() {
 
   return (
     <TooltipProvider delay={300}>
-      <div className="flex min-h-svh flex-col lg:h-svh">
+      <div className="flex min-h-svh flex-col lg:h-svh lg:min-h-[40rem]">
         <header className="flex h-11 shrink-0 items-center gap-3 border-b px-4">
           <div className="flex items-center gap-2">
             <img src="/favicon.svg" alt="" className="size-5" />
