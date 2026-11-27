@@ -2,6 +2,8 @@
   "name": "tableflip",
   "private": true,
   "version": "0.0.1",
+  "description": "Convert tables between spreadsheets, documents and code, in your browser.",
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "dev": "vite",
