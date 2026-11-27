@@ -26,7 +26,13 @@ export function ErrorMessage({ title, children, onDismiss, className }: MessageP
         {children}
       </p>
       {onDismiss && (
-        <Button variant="ghost" size="icon-xs" className="-my-0.5 text-destructive" onClick={onDismiss} aria-label="Dismiss">
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          className="-my-0.5 text-destructive"
+          onClick={onDismiss}
+          aria-label="Dismiss"
+        >
           <XIcon />
         </Button>
       )}

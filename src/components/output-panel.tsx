@@ -83,7 +83,10 @@ export const OutputPanel = memo(function OutputPanel({
   // matter, so changing another format's settings doesn't rewrite the output.
   const shownOptions = useDeferredValue(options)
   const formatOptions = shownOptions[format]
-  const output = useMemo(() => (view ? write(view, format, formatOptions) : null), [view, format, formatOptions])
+  const output = useMemo(
+    () => (view ? write(view, format, formatOptions) : null),
+    [view, format, formatOptions]
+  )
   const behind = stale || formatOptions !== options[format]
 
   const info = OUTPUT_FORMATS.find((item) => item.id === format)!
@@ -116,10 +119,14 @@ export const OutputPanel = memo(function OutputPanel({
       if (!fresh) return
       const content = format === "html" ? writeHtmlDocument(fresh, options.html) : latestText(fresh)
       // Excel only splits a .csv file at commas (or the system's list separator).
-      const [extension, mimeType] = tabs ? ["tsv", "text/tab-separated-values"] : [info.extension, info.mimeType]
+      const [extension, mimeType] = tabs
+        ? ["tsv", "text/tab-separated-values"]
+        : [info.extension, info.mimeType]
       downloadText(content, `table.${extension}`, mimeType, format === "csv")
     } catch (error) {
-      toast.error("Couldn't download", { description: error instanceof Error ? error.message : String(error) })
+      toast.error("Couldn't download", {
+        description: error instanceof Error ? error.message : String(error),
+      })
     }
   }
 
@@ -128,7 +135,7 @@ export const OutputPanel = memo(function OutputPanel({
   return (
     <Panel aria-label="Output" className={className}>
       <Tabs value={format} onValueChange={(value) => onFormatChange(value as OutputFormat)} className="gap-0">
-        <PanelHeader className="flex-nowrap overflow-x-auto px-2 [scrollbar-width:none] max-xl:mask-r-from-[calc(100%-2rem)]">
+        <PanelHeader className="[scrollbar-width:none] flex-nowrap overflow-x-auto px-2 max-xl:mask-r-from-[calc(100%-2rem)]">
           <TabsList variant="line" aria-label="Output format" className="h-7">
             {OUTPUT_FORMATS.map((item) => (
               <TabsTrigger key={item.id} value={item.id} className="px-2">
@@ -189,7 +196,12 @@ export const OutputPanel = memo(function OutputPanel({
         </div>
       </div>
 
-      <div className={cn("relative flex min-h-64 flex-1 flex-col transition-opacity", behind && "opacity-60 delay-300")}>
+      <div
+        className={cn(
+          "relative flex min-h-64 flex-1 flex-col transition-opacity",
+          behind && "opacity-60 delay-300"
+        )}
+      >
         {output?.error && (
           <ErrorMessage className="m-3" title="Couldn't write this format.">
             {output.error}
@@ -227,7 +239,8 @@ export const OutputPanel = memo(function OutputPanel({
       {stats && (
         <div className="flex shrink-0 items-center gap-3 border-t px-3 py-1.5 text-[11px] text-muted-foreground tabular-nums">
           <span>
-            {stats.lines.toLocaleString("en-US")} {stats.lines === 1 ? "line" : "lines"} · {formatBytes(stats.bytes)}
+            {stats.lines.toLocaleString("en-US")} {stats.lines === 1 ? "line" : "lines"} ·{" "}
+            {formatBytes(stats.bytes)}
           </span>
           {format === "excel" && <span>Paste into Excel with {shortcut("V")} after copying.</span>}
           {text !== null && shown !== text && (

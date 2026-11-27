@@ -2,9 +2,33 @@ import { assertCellCount } from "../limits"
 import { looksLikeHeader, makeTable, TableReadError, type ParsedTable } from "../table"
 
 const BLOCK_TAGS = new Set([
-  "ADDRESS", "ARTICLE", "BLOCKQUOTE", "DD", "DIV", "DL", "DT", "FIGCAPTION",
-  "FIGURE", "FOOTER", "H1", "H2", "H3", "H4", "H5", "H6", "HEADER", "HR", "LI",
-  "MAIN", "NAV", "OL", "P", "PRE", "SECTION", "TABLE", "UL",
+  "ADDRESS",
+  "ARTICLE",
+  "BLOCKQUOTE",
+  "DD",
+  "DIV",
+  "DL",
+  "DT",
+  "FIGCAPTION",
+  "FIGURE",
+  "FOOTER",
+  "H1",
+  "H2",
+  "H3",
+  "H4",
+  "H5",
+  "H6",
+  "HEADER",
+  "HR",
+  "LI",
+  "MAIN",
+  "NAV",
+  "OL",
+  "P",
+  "PRE",
+  "SECTION",
+  "TABLE",
+  "UL",
 ])
 const SKIPPED_TAGS = new Set(["SCRIPT", "STYLE", "TEMPLATE", "NOSCRIPT", "HEAD"])
 const MAX_SPAN = 1000
@@ -115,7 +139,6 @@ export function readHtml(html: string): ParsedTable {
   const firstRow = rows[0]
   const headerMarked =
     firstRow.parentElement?.tagName === "THEAD" ||
-    (firstRow.cells.length > 0 &&
-      Array.from(firstRow.cells).every((cell) => cell.tagName === "TH"))
+    (firstRow.cells.length > 0 && Array.from(firstRow.cells).every((cell) => cell.tagName === "TH"))
   return makeTable(dense, headerMarked || looksLikeHeader(dense))
 }

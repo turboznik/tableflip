@@ -67,7 +67,5 @@ export function writeJson(view: TableView, options: JsonOptions): string {
 
 export function writeJsonLines(view: TableView, options: JsonLinesOptions): string {
   const { keys, rows } = prepare(view, options)
-  return rows
-    .map((values) => (keys ? objectText(keys, values, null) : `[${values.join(",")}]`))
-    .join("\n")
+  return rows.map((values) => (keys ? objectText(keys, values, null) : `[${values.join(",")}]`)).join("\n")
 }

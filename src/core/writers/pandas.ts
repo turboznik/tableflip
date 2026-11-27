@@ -8,17 +8,46 @@ export interface PandasOptions {
 }
 
 const PYTHON_KEYWORDS = new Set([
-  "False", "None", "True", "and", "as", "assert", "async", "await", "break",
-  "class", "continue", "def", "del", "elif", "else", "except", "finally", "for",
-  "from", "global", "if", "import", "in", "is", "lambda", "nonlocal", "not", "or",
-  "pass", "raise", "return", "try", "while", "with", "yield",
+  "False",
+  "None",
+  "True",
+  "and",
+  "as",
+  "assert",
+  "async",
+  "await",
+  "break",
+  "class",
+  "continue",
+  "def",
+  "del",
+  "elif",
+  "else",
+  "except",
+  "finally",
+  "for",
+  "from",
+  "global",
+  "if",
+  "import",
+  "in",
+  "is",
+  "lambda",
+  "nonlocal",
+  "not",
+  "or",
+  "pass",
+  "raise",
+  "return",
+  "try",
+  "while",
+  "with",
+  "yield",
 ])
 
 function variableName(name: string): string {
   const trimmed = name.trim()
-  return /^[A-Za-z_][A-Za-z0-9_]*$/.test(trimmed) && !PYTHON_KEYWORDS.has(trimmed)
-    ? trimmed
-    : "df"
+  return /^[A-Za-z_][A-Za-z0-9_]*$/.test(trimmed) && !PYTHON_KEYWORDS.has(trimmed) ? trimmed : "df"
 }
 
 /** JSON string syntax is also a valid Python string literal. */

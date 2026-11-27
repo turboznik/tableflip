@@ -79,9 +79,6 @@ export function writeTable<F extends OutputFormat>(
   format: F,
   options: OutputOptions[F]
 ): string {
-  const write = WRITERS[format] as (
-    view: TableView,
-    options: OutputOptions[F]
-  ) => string
+  const write = WRITERS[format] as (view: TableView, options: OutputOptions[F]) => string
   return write(view, options)
 }

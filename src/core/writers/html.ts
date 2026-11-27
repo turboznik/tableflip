@@ -10,11 +10,7 @@ const CELL_STYLE = "border: 1px solid #d4d4d4; padding: 4px 8px; text-align: lef
 const HEADER_STYLE = `${CELL_STYLE}; background: #f5f5f5; font-weight: bold`
 
 export function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
+  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;")
 }
 
 /** Spaces that HTML would collapse: runs of them, and any at the start or end of a line. */
@@ -26,7 +22,8 @@ const COLLAPSED_SPACES = / {2,}|^ | $|(?<=[\r\n]) | (?=[\r\n])/g
  */
 function cellHtml(text: string, lineBreak: string, keepSpaces = false): string {
   let html = escapeHtml(text)
-  if (keepSpaces) html = html.replace(COLLAPSED_SPACES, (spaces) => `<span style='mso-spacerun:yes'>${spaces}</span>`)
+  if (keepSpaces)
+    html = html.replace(COLLAPSED_SPACES, (spaces) => `<span style='mso-spacerun:yes'>${spaces}</span>`)
   return html.replace(/\r\n|\r|\n/g, lineBreak)
 }
 
@@ -86,8 +83,7 @@ export function excelHtmlRows(view: TableView, keepText: boolean): string {
   const open = keepText ? `<td style='mso-number-format:"\\@"'>` : "<td>"
   return allRows(view)
     .map(
-      (cells) =>
-        `<tr>${cells.map((cell) => `${open}${cellHtml(cell, lineBreak, true)}</td>`).join("")}</tr>`
+      (cells) => `<tr>${cells.map((cell) => `${open}${cellHtml(cell, lineBreak, true)}</td>`).join("")}</tr>`
     )
     .join("")
 }

@@ -37,7 +37,13 @@ function Toggle({
       {hint && (
         <Tooltip>
           <TooltipTrigger
-            render={<button type="button" className="text-muted-foreground hover:text-foreground" aria-label={`About ${label}`} />}
+            render={
+              <button
+                type="button"
+                className="text-muted-foreground hover:text-foreground"
+                aria-label={`About ${label}`}
+              />
+            }
           >
             <InfoIcon className="size-3" />
           </TooltipTrigger>
@@ -174,7 +180,11 @@ export function OutputOptionsBar({ format, options, setOptions }: OutputOptionsP
             checked={options.json.detectTypes}
             onChange={(detectTypes) => setOptions("json", { detectTypes })}
           />
-          <Toggle label="Minify" checked={options.json.minify} onChange={(minify) => setOptions("json", { minify })} />
+          <Toggle
+            label="Minify"
+            checked={options.json.minify}
+            onChange={(minify) => setOptions("json", { minify })}
+          />
         </>
       )
     case "jsonl":

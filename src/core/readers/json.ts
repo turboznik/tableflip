@@ -9,17 +9,10 @@ class RawNumber {
   }
 }
 
-type Reviver = (
-  this: unknown,
-  key: string,
-  value: unknown,
-  context?: { source?: string }
-) => unknown
+type Reviver = (this: unknown, key: string, value: unknown, context?: { source?: string }) => unknown
 
 const keepNumberSource: Reviver = (_key, value, context) =>
-  typeof value === "number" && context?.source !== undefined
-    ? new RawNumber(context.source)
-    : value
+  typeof value === "number" && context?.source !== undefined ? new RawNumber(context.source) : value
 
 export function parseJson(text: string): unknown {
   try {
@@ -38,12 +31,7 @@ function jsonErrorDetail(error: unknown): string {
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    !Array.isArray(value) &&
-    !(value instanceof RawNumber)
-  )
+  return typeof value === "object" && value !== null && !Array.isArray(value) && !(value instanceof RawNumber)
 }
 
 /** Turns a JSON value into the text shown in a cell. */
@@ -71,11 +59,7 @@ function stringifyRaw(value: unknown): string {
 }
 
 /** Flattens nested objects into dotted keys: {a: {b: 1}} becomes {"a.b": 1}. */
-function flatten(
-  value: Record<string, unknown>,
-  prefix: string,
-  into: Map<string, string>
-): void {
+function flatten(value: Record<string, unknown>, prefix: string, into: Map<string, string>): void {
   for (const [key, inner] of Object.entries(value)) {
     const path = prefix ? `${prefix}.${key}` : key
     if (isPlainObject(inner) && Object.keys(inner).length > 0) {
@@ -116,10 +100,7 @@ export function tableFromItems(items: unknown[]): ParsedTable {
     return makeTable(rows, true)
   }
 
-  return makeTable(
-    [["value"], ...items.map((item) => [cellText(item)])],
-    true
-  )
+  return makeTable([["value"], ...items.map((item) => [cellText(item)])], true)
 }
 
 /**

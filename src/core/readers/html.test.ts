@@ -75,8 +75,8 @@ describe("readHtml", () => {
   })
 
   it("caps huge spans and refuses tables over the limit", () => {
-    expect(() =>
-      readHtml(`<table>${'<tr><td colspan="99999">x</td></tr>'.repeat(200)}</table>`)
-    ).toThrow(TooMuchDataError)
+    expect(() => readHtml(`<table>${'<tr><td colspan="99999">x</td></tr>'.repeat(200)}</table>`)).toThrow(
+      TooMuchDataError
+    )
   })
 })

@@ -22,8 +22,7 @@ export function formatCount(value: number): string {
 
 /** Rounds up when `roundUp` is set, so an oversized input never reads as "5.0 MB". */
 export function formatBytes(bytes: number, roundUp = false): string {
-  const round = (value: number) =>
-    roundUp ? (Math.ceil(value * 10) / 10).toFixed(1) : value.toFixed(1)
+  const round = (value: number) => (roundUp ? (Math.ceil(value * 10) / 10).toFixed(1) : value.toFixed(1))
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${round(bytes / 1024)} KB`
   const mb = bytes / (1024 * 1024)

@@ -41,9 +41,7 @@ export function writeAscii(view: TableView, options: AsciiOptions): string {
   const border = BORDERS[options.style]
   const numeric = columnKinds(view.body, view.columnCount).map(isNumericKind)
 
-  const rows = [...(view.header ? [view.header] : []), ...view.body].map((row) =>
-    row.map(cellLines)
-  )
+  const rows = [...(view.header ? [view.header] : []), ...view.body].map((row) => row.map(cellLines))
   const widths = new Array<number>(view.columnCount).fill(1)
   for (const row of rows) {
     row.forEach((lines, i) => {

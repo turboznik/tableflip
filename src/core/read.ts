@@ -35,8 +35,7 @@ export interface ReadResult {
   delimiter?: Delimiter
 }
 
-const MARKDOWN_DELIMITER_ROW =
-  /^[ \t]*\|?[ \t]*:?-+:?[ \t]*(?:\|[ \t]*:?-+:?[ \t]*)*\|?[ \t]*$/gm
+const MARKDOWN_DELIMITER_ROW = /^[ \t]*\|?[ \t]*:?-+:?[ \t]*(?:\|[ \t]*:?-+:?[ \t]*)*\|?[ \t]*$/gm
 const HTML_TABLE = /<table[\s>]/i
 const HTML_DOCUMENT = /^<(?:!doctype|html|head|body)[\s>]/i
 

@@ -52,21 +52,19 @@ describe("readTable", () => {
   })
 
   it("says when HTML has no table", () => {
-    expect(() => readTable("<!doctype html><p>No table here</p>", "auto")).toThrow("No table found in this HTML.")
+    expect(() => readTable("<!doctype html><p>No table here</p>", "auto")).toThrow(
+      "No table found in this HTML."
+    )
   })
 
   it("uses the format it's told", () => {
-    expect(readTable('[{"a":1}]', "delimited").table.rows[0]).toEqual([
-      '[{"a":1}]',
-    ])
+    expect(readTable('[{"a":1}]', "delimited").table.rows[0]).toEqual(['[{"a":1}]'])
   })
 
   it("refuses text over the size limit", () => {
     const text = "x".repeat(MAX_INPUT_BYTES + 1)
     expect(() => readTable(text, "auto")).toThrow(TooMuchDataError)
-    expect(() => readTable(text, "auto")).toThrow(
-      "tableflip accepts up to 5 MB of text. This is 5.1 MB."
-    )
+    expect(() => readTable(text, "auto")).toThrow("tableflip accepts up to 5 MB of text. This is 5.1 MB.")
   })
 
   it("counts bytes, not characters, near the limit", () => {

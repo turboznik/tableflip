@@ -29,8 +29,7 @@ export function writeMarkdown(view: TableView, options: MarkdownOptions): string
       widths[i] = Math.max(widths[i], textWidth(cell))
     })
   }
-  const line = (cells: string[]) =>
-    `| ${cells.map((cell, i) => padEnd(cell, widths[i])).join(" | ")} |`
+  const line = (cells: string[]) => `| ${cells.map((cell, i) => padEnd(cell, widths[i])).join(" | ")} |`
   const rule = `| ${widths.map((width) => "-".repeat(width)).join(" | ")} |`
   return [line(header), rule, ...body.map(line)].join("\n")
 }

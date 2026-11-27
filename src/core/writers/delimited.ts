@@ -8,19 +8,12 @@ export interface CsvOptions {
 
 function quote(value: string, delimiter: string): string {
   const needsQuotes =
-    value.includes(delimiter) ||
-    value.includes('"') ||
-    value.includes("\n") ||
-    value.includes("\r")
+    value.includes(delimiter) || value.includes('"') || value.includes("\n") || value.includes("\r")
   return needsQuotes ? `"${value.replace(/"/g, '""')}"` : value
 }
 
 /** Delimited text with standard quoting, which is also what Excel pastes. */
-export function writeDelimited(
-  view: TableView,
-  delimiter: string,
-  newline = "\r\n"
-): string {
+export function writeDelimited(view: TableView, delimiter: string, newline = "\r\n"): string {
   return allRows(view)
     .map((row) => row.map((cell) => quote(cell, delimiter)).join(delimiter))
     .join(newline)

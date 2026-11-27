@@ -43,12 +43,14 @@ describe("columnKinds", () => {
 
 describe("columnNames", () => {
   it("fills blanks and makes duplicates unique", () => {
-    expect(columnNames(view([["a", "", "a", "a_2"], ["1", "2", "3", "4"]]))).toEqual([
-      "a",
-      "Column 2",
-      "a_2",
-      "a_2_2",
-    ])
+    expect(
+      columnNames(
+        view([
+          ["a", "", "a", "a_2"],
+          ["1", "2", "3", "4"],
+        ])
+      )
+    ).toEqual(["a", "Column 2", "a_2", "a_2_2"])
   })
 })
 
@@ -106,7 +108,15 @@ describe("Excel", () => {
 
 describe("HTML", () => {
   it("writes one row per line with a header", () => {
-    expect(writeHtml(view([["A", "B"], ["<1>", "x\ny"]]), { inlineStyles: false })).toBe(
+    expect(
+      writeHtml(
+        view([
+          ["A", "B"],
+          ["<1>", "x\ny"],
+        ]),
+        { inlineStyles: false }
+      )
+    ).toBe(
       [
         "<table>",
         "  <thead>",
@@ -152,9 +162,15 @@ describe("Markdown", () => {
   })
 
   it("writes compact tables", () => {
-    expect(writeMarkdown(view([["a", "b"], ["1", "2"]]), { align: false })).toBe(
-      "| a | b |\n| --- | --- |\n| 1 | 2 |"
-    )
+    expect(
+      writeMarkdown(
+        view([
+          ["a", "b"],
+          ["1", "2"],
+        ]),
+        { align: false }
+      )
+    ).toBe("| a | b |\n| --- | --- |\n| 1 | 2 |")
   })
 
   it("names columns when there's no header", () => {
@@ -164,7 +180,13 @@ describe("Markdown", () => {
   })
 
   it("pads wide characters by display width", () => {
-    const lines = writeMarkdown(view([["名前", "x"], ["abcd", "y"]]), { align: true }).split("\n")
+    const lines = writeMarkdown(
+      view([
+        ["名前", "x"],
+        ["abcd", "y"],
+      ]),
+      { align: true }
+    ).split("\n")
     expect(lines[0]).toBe("| 名前 | x   |")
     expect(lines[2]).toBe("| abcd | y   |")
   })
@@ -200,9 +222,15 @@ describe("JSON", () => {
       "Enabled",
       "Notes",
     ])
-    expect(writeJson(view([["a", "b"], ["1", "2"]]), { ...options, shape: "arrays" })).toBe(
-      '[\n  ["a", "b"],\n  [1, 2]\n]'
-    )
+    expect(
+      writeJson(
+        view([
+          ["a", "b"],
+          ["1", "2"],
+        ]),
+        { ...options, shape: "arrays" }
+      )
+    ).toBe('[\n  ["a", "b"],\n  [1, 2]\n]')
   })
 
   it("minifies", () => {
@@ -221,18 +249,40 @@ describe("JSON", () => {
 
 describe("JSON Lines", () => {
   it("writes one value per line", () => {
-    expect(writeJsonLines(view([["a", "b"], ["1", "x"], ["2", "y"]]), DEFAULT_OPTIONS.jsonl)).toBe(
-      '{"a":1,"b":"x"}\n{"a":2,"b":"y"}'
-    )
     expect(
-      writeJsonLines(view([["a", "b"], ["1", "x"]]), { shape: "arrays", detectTypes: false })
+      writeJsonLines(
+        view([
+          ["a", "b"],
+          ["1", "x"],
+          ["2", "y"],
+        ]),
+        DEFAULT_OPTIONS.jsonl
+      )
+    ).toBe('{"a":1,"b":"x"}\n{"a":2,"b":"y"}')
+    expect(
+      writeJsonLines(
+        view([
+          ["a", "b"],
+          ["1", "x"],
+        ]),
+        { shape: "arrays", detectTypes: false }
+      )
     ).toBe('["a","b"]\n["1","x"]')
   })
 })
 
 describe("ASCII", () => {
   it("draws a classic table with numbers on the right", () => {
-    expect(writeAscii(view([["Tag", "Range"], ["FT-101", "5"], ["PT-2", "10.5"]]), { style: "classic" })).toBe(
+    expect(
+      writeAscii(
+        view([
+          ["Tag", "Range"],
+          ["FT-101", "5"],
+          ["PT-2", "10.5"],
+        ]),
+        { style: "classic" }
+      )
+    ).toBe(
       [
         "+--------+-------+",
         "| Tag    | Range |",
@@ -271,10 +321,16 @@ describe("DAX", () => {
   })
 
   it("keeps exponents and huge integers as text", () => {
-    const dax = writeDax(view([["a", "b"], ["1e5", "99999999999999999999"]]), {
-      tableName: "",
-      detectTypes: true,
-    })
+    const dax = writeDax(
+      view([
+        ["a", "b"],
+        ["1e5", "99999999999999999999"],
+      ]),
+      {
+        tableName: "",
+        detectTypes: true,
+      }
+    )
     expect(dax).toContain('"a", STRING,')
     expect(dax).toContain('"b", STRING,')
     expect(dax.startsWith("Table = DATATABLE(")).toBe(true)
@@ -316,7 +372,14 @@ describe("Pandas", () => {
 
 describe("Typst", () => {
   it("writes strings, escaping only what strings need", () => {
-    expect(writeTypst(view([["Tag", "Notes"], ["FT-101", 'a "b" \\ #c\nd']]))).toBe(
+    expect(
+      writeTypst(
+        view([
+          ["Tag", "Notes"],
+          ["FT-101", 'a "b" \\ #c\nd'],
+        ])
+      )
+    ).toBe(
       [
         "#table(",
         "  columns: 2,",

@@ -47,7 +47,10 @@ export function writeDax(view: TableView, options: DaxOptions): string {
   const names = columnNames(view)
   const types: DaxType[] = options.detectTypes
     ? columnKinds(view.body, view.columnCount).map((kind, i) =>
-        daxType(kind, view.body.map((row) => row[i]))
+        daxType(
+          kind,
+          view.body.map((row) => row[i])
+        )
       )
     : names.map(() => "STRING")
 

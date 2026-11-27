@@ -35,7 +35,10 @@ interface InputPanelProps {
   onDismissActionError: () => void
 }
 
-const FORMAT_ITEMS = [{ value: "auto", label: "Auto-detect" }, ...INPUT_FORMATS.map((f) => ({ value: f.id, label: f.label }))]
+const FORMAT_ITEMS = [
+  { value: "auto", label: "Auto-detect" },
+  ...INPUT_FORMATS.map((f) => ({ value: f.id, label: f.label })),
+]
 
 const DELIMITER_NAMES: Record<string, string> = {
   ",": "comma-separated",
@@ -139,8 +142,8 @@ export function InputPanel({
               </p>
               <p className="hidden text-sm font-medium pointer-coarse:block">Tap here and paste a table</p>
               <p className="max-w-80 text-xs text-pretty text-muted-foreground">
-                From Excel, Google Sheets, Word or a web page, or as CSV, JSON, Markdown or HTML. You can also drop a
-                file here.
+                From Excel, Google Sheets, Word or a web page, or as CSV, JSON, Markdown or HTML. You can also
+                drop a file here.
               </p>
             </div>
             <Button variant="outline" size="sm" className="pointer-events-auto" onClick={onExample}>
@@ -165,7 +168,12 @@ export function InputPanel({
               {result?.delimiter && result.table.columnCount > 1 && `, ${DELIMITER_NAMES[result.delimiter]}`}
             </span>
           )}
-          {note && <span className="min-w-0 truncate">{formatLabel && "· "}{note}</span>}
+          {note && (
+            <span className="min-w-0 truncate">
+              {formatLabel && "· "}
+              {note}
+            </span>
+          )}
           {pending && (
             <span className="appear-delayed" role="status" aria-label="Reading">
               <LoaderCircleIcon className="size-3 animate-spin" aria-hidden />

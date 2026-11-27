@@ -49,7 +49,10 @@ export const PreviewTable = memo(function PreviewTable({ table, hasHeader }: Pre
                 {row.slice(0, columns).map((cell, c) => (
                   <td
                     key={c}
-                    className={cn("max-w-60 truncate border-r border-b px-2 whitespace-pre", !cell && "bg-muted/20")}
+                    className={cn(
+                      "max-w-60 truncate border-r border-b px-2 whitespace-pre",
+                      !cell && "bg-muted/20"
+                    )}
                     title={cell.length > 30 || cell.includes("\n") ? cell : undefined}
                   >
                     {cell.replace(/\r?\n/g, " ↵ ")}
@@ -65,7 +68,8 @@ export const PreviewTable = memo(function PreviewTable({ table, hasHeader }: Pre
           Preview shows{" "}
           {[
             hiddenRows > 0 && `the first ${formatCount(body.length)} of ${formatCount(totalBody)} rows`,
-            hiddenColumns > 0 && `the first ${formatCount(columns)} of ${formatCount(table.columnCount)} columns`,
+            hiddenColumns > 0 &&
+              `the first ${formatCount(columns)} of ${formatCount(table.columnCount)} columns`,
           ]
             .filter(Boolean)
             .join(" and ")}

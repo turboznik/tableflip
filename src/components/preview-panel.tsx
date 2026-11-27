@@ -49,7 +49,9 @@ export const PreviewPanel = memo(function PreviewPanel({
         </div>
       </PanelHeader>
       {table ? (
-        <div className={cn("flex min-h-0 flex-1 flex-col transition-opacity", stale && "opacity-60 delay-300")}>
+        <div
+          className={cn("flex min-h-0 flex-1 flex-col transition-opacity", stale && "opacity-60 delay-300")}
+        >
           <PreviewTable table={table} hasHeader={hasHeader} />
         </div>
       ) : (

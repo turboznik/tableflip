@@ -26,10 +26,7 @@ export class TableReadError extends Error {
  * Pads ragged rows to the same width and drops trailing empty rows.
  * Checks the cell limit before allocating anything new.
  */
-export function makeTable(
-  rawRows: string[][],
-  headerSuggested: boolean
-): ParsedTable {
+export function makeTable(rawRows: string[][], headerSuggested: boolean): ParsedTable {
   let end = rawRows.length
   while (end > 0 && rawRows[end - 1].every((cell) => cell === "")) end--
 

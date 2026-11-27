@@ -26,7 +26,11 @@ const SPREADSHEET_SOURCE =
  */
 export function choosePaste(html: string, plain: string): PastedInput {
   if (html !== "" && SPREADSHEET_SOURCE.test(html.slice(0, 4000))) {
-    return { text: plain, hint: { format: "delimited", delimiter: "\t", spreadsheet: true }, fromRichTable: false }
+    return {
+      text: plain,
+      hint: { format: "delimited", delimiter: "\t", spreadsheet: true },
+      fromRichTable: false,
+    }
   }
 
   if (html !== "" && html.length <= MAX_INPUT_BYTES * 4 && /<table[\s>]/i.test(html)) {

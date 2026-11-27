@@ -127,7 +127,11 @@ describe("readDelimited with spreadsheet text", () => {
   })
 
   it("keeps empty cells and rows", () => {
-    expect(read("a\t\tc\r\n\r\nd\t\t\r\n")).toEqual([["a", "", "c"], ["", "", ""], ["d", "", ""]])
+    expect(read("a\t\tc\r\n\r\nd\t\t\r\n")).toEqual([
+      ["a", "", "c"],
+      ["", "", ""],
+      ["d", "", ""],
+    ])
   })
 })
 
@@ -153,7 +157,9 @@ describe("readJson", () => {
   })
 
   it("flattens nested objects and writes arrays as JSON", () => {
-    const table = readJson('[{"id":1,"loc":{"area":"A1","rack":{"n":2}},"tags":[1.0,"x"],"none":null,"ok":true}]')
+    const table = readJson(
+      '[{"id":1,"loc":{"area":"A1","rack":{"n":2}},"tags":[1.0,"x"],"none":null,"ok":true}]'
+    )
     expect(table.rows).toEqual([
       ["id", "loc.area", "loc.rack.n", "tags", "none", "ok"],
       ["1", "A1", "2", '[1.0,"x"]', "", "true"],
@@ -206,7 +212,18 @@ describe("readJson", () => {
   })
 
   it("refuses too many cells before building rows", () => {
-    const items = Array.from({ length: 10_001 }, (_, i) => ({ a: i, b: i, c: i, d: i, e: i, f: i, g: i, h: i, i: i, j: i }))
+    const items = Array.from({ length: 10_001 }, (_, i) => ({
+      a: i,
+      b: i,
+      c: i,
+      d: i,
+      e: i,
+      f: i,
+      g: i,
+      h: i,
+      i: i,
+      j: i,
+    }))
     expect(() => readJson(JSON.stringify(items))).toThrow(TooMuchDataError)
   })
 })

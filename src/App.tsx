@@ -131,7 +131,10 @@ export function App() {
       if (latest?.error) throw new Error(latest.error.message)
       if (!latest) return null
       const { table } = latest.result
-      return toView(table, headerOverride?.revision === input.revision ? headerOverride.value : table.headerSuggested)
+      return toView(
+        table,
+        headerOverride?.revision === input.revision ? headerOverride.value : table.headerSuggested
+      )
     }
   })
   const getView = useCallback(() => readLatest.current(), [])
@@ -159,7 +162,11 @@ export function App() {
     try {
       const text = await readTextFile(file)
       if (action !== latestAction.current) return
-      replaceInput(text, hintForFile(file.name), files.length > 1 ? `Opened ${file.name} only` : `Opened ${file.name}`)
+      replaceInput(
+        text,
+        hintForFile(file.name),
+        files.length > 1 ? `Opened ${file.name} only` : `Opened ${file.name}`
+      )
     } catch (error) {
       if (action === latestAction.current) showActionError(error)
     }
@@ -227,7 +234,10 @@ export function App() {
     let internal = false
     const accepts = (event: DragEvent) => {
       const types = event.dataTransfer ? [...event.dataTransfer.types] : []
-      return types.includes("Files") || (!internal && (types.includes("text/plain") || types.includes("text/html")))
+      return (
+        types.includes("Files") ||
+        (!internal && (types.includes("text/plain") || types.includes("text/html")))
+      )
     }
 
     const hide = () => {
@@ -314,7 +324,8 @@ export function App() {
             <h1 className="text-sm font-semibold tracking-tight">tableflip</h1>
           </div>
           <p className="hidden truncate text-xs text-muted-foreground md:block">
-            Convert tables between Excel, CSV, HTML, Markdown, JSON and more. Nothing you paste leaves your browser.
+            Convert tables between Excel, CSV, HTML, Markdown, JSON and more. Nothing you paste leaves your
+            browser.
           </p>
           <ThemeToggle />
         </header>
@@ -336,7 +347,9 @@ export function App() {
               setActionError(null)
               // Emptied by hand: whatever comes next is new, so forget what the last paste said.
               setInput((prev) =>
-                text === "" ? { ...prev, text, hint: {}, typed: true, note: null } : { ...prev, text, typed: true }
+                text === ""
+                  ? { ...prev, text, hint: {}, typed: true, note: null }
+                  : { ...prev, text, typed: true }
               )
             }}
             onFormatChange={(format) => setInput((prev) => ({ ...prev, format, typed: false }))}
@@ -373,7 +386,9 @@ export function App() {
           <div className="flex flex-col items-center gap-2 rounded-xl border-2 border-dashed border-primary/40 px-12 py-10 text-center">
             <FileDownIcon className="size-6 text-muted-foreground" aria-hidden />
             <p className="text-sm font-medium">Drop to open</p>
-            <p className="text-xs text-muted-foreground">CSV, TSV, JSON, JSON Lines, Markdown, HTML or text</p>
+            <p className="text-xs text-muted-foreground">
+              CSV, TSV, JSON, JSON Lines, Markdown, HTML or text
+            </p>
           </div>
         </div>
       )}
