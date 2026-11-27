@@ -3,8 +3,7 @@
 ## Status
 
 Feature-complete first version. Every planned format reads and writes;
-unit and browser tests pass. The repository is private until it has been
-reviewed for publishing.
+unit and browser tests pass.
 
 ## Done
 
@@ -86,8 +85,6 @@ See [README.md](README.md). In short: `npm install`, `npm run dev`;
 
 ## Next
 
-- Review the repository before making it public (this file can be removed or
-  kept as a changelog).
 - Try real pastes from desktop Excel, Word and Outlook on Windows.
 
 ## Known limitations
