@@ -49,13 +49,82 @@ export function guessDelimiter(text: string): Delimiter | null {
   return best?.delimiter ?? null
 }
 
+const TAB = 9
+const LF = 10
+const CR = 13
+const QUOTE = 34
+
+/**
+ * Where a quoted spreadsheet cell ends, or -1 when the opening quote is part
+ * of the value. Spreadsheets only quote cells that hold line breaks, so a cell
+ * like `"` (a ditto mark) or `"A" phase` is copied as it is.
+ */
+function quotedCellEnd(text: string, start: number): number {
+  let lineBreak = false
+  for (let i = start + 1; i < text.length; i++) {
+    const code = text.charCodeAt(i)
+    // Cells can't hold tabs, so the quote didn't open a quoted cell.
+    if (code === TAB) return -1
+    if (code === LF || code === CR) lineBreak = true
+    if (code !== QUOTE) continue
+    if (text.charCodeAt(i + 1) === QUOTE) {
+      i++
+      continue
+    }
+    const next = text.charCodeAt(i + 1)
+    const atCellEnd = i + 1 === text.length || next === TAB || next === LF || next === CR
+    return atCellEnd && lineBreak ? i : -1
+  }
+  return -1
+}
+
+/** Splits the tab-separated text that Excel and Google Sheets put on the clipboard. */
+function eachSpreadsheetRow(text: string, visit: (row: string[]) => void): void {
+  let row: string[] = []
+  let i = 0
+  for (;;) {
+    const close = text.charCodeAt(i) === QUOTE ? quotedCellEnd(text, i) : -1
+    if (close !== -1) {
+      row.push(text.slice(i + 1, close).replaceAll('""', '"'))
+      i = close + 1
+    } else {
+      let end = i
+      while (end < text.length) {
+        const code = text.charCodeAt(end)
+        if (code === TAB || code === LF || code === CR) break
+        end++
+      }
+      row.push(text.slice(i, end))
+      i = end
+    }
+    if (i >= text.length) break
+    const code = text.charCodeAt(i)
+    if (code === TAB) {
+      i++
+      continue
+    }
+    i += code === CR && text.charCodeAt(i + 1) === LF ? 2 : 1
+    visit(row)
+    row = []
+    if (i >= text.length) return
+  }
+  visit(row)
+}
+
+export interface DelimitedOptions {
+  /** Leave out to detect it. */
+  delimiter?: Delimiter
+  /** Text from a spreadsheet's clipboard, which quotes cells its own way. */
+  spreadsheet?: boolean
+}
+
 /**
  * Reads CSV, TSV and other delimited text, including what Excel and Google
- * Sheets put on the clipboard. Leave `delimiter` out to detect it.
+ * Sheets put on the clipboard.
  */
 export function readDelimited(
   text: string,
-  delimiter?: Delimiter
+  { delimiter, spreadsheet = false }: DelimitedOptions = {}
 ): DelimitedTable {
   const source = text.replace(/^\uFEFF/, "")
   const rows: string[][] = []
@@ -67,24 +136,28 @@ export function readDelimited(
   const used = delimiter ?? guessDelimiter(source) ?? "\t"
 
   // Streams rows so a huge paste is counted without keeping every row around.
-  Papa.parse<string[]>(source, {
-    delimiter: used,
-    skipEmptyLines: false,
-    step(step) {
-      const row = step.data
-      const index = rowCount++
-      if (row.length === 1 && row[0] === "") {
-        if (storing) rows.push(row)
-        return
-      }
-      lastFilledRow = index
-      widest = Math.max(widest, row.length)
-      if (storing) {
-        rows.push(row)
-        if (rows.length * widest > MAX_CELLS) storing = false
-      }
-    },
-  })
+  const visit = (row: string[]) => {
+    const index = rowCount++
+    if (row.length === 1 && row[0] === "") {
+      if (storing) rows.push(row)
+      return
+    }
+    lastFilledRow = index
+    widest = Math.max(widest, row.length)
+    if (storing) {
+      rows.push(row)
+      if (rows.length * widest > MAX_CELLS) storing = false
+    }
+  }
+  if (spreadsheet && used === "\t") {
+    eachSpreadsheetRow(source, visit)
+  } else {
+    Papa.parse<string[]>(source, {
+      delimiter: used,
+      skipEmptyLines: false,
+      step: (step) => visit(step.data),
+    })
+  }
 
   assertCellCount(lastFilledRow + 1, widest)
   const table = makeTable(rows, false)

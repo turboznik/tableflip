@@ -8,6 +8,7 @@ import { Kbd } from "@/components/ui/kbd"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { formatBytes, INPUT_FORMATS, type InputFormat, type ReadResult } from "@/core"
 import { ACCEPTED_FILES } from "@/lib/files"
+import { isMac } from "@/lib/platform"
 
 export interface InputProblem {
   title?: string
@@ -43,8 +44,6 @@ const DELIMITER_NAMES: Record<string, string> = {
   "|": "pipe-separated",
 }
 
-const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform)
-
 export function InputPanel({
   text,
   format,
@@ -67,7 +66,7 @@ export function InputPanel({
   const formatLabel = result && INPUT_FORMATS.find((f) => f.id === result.format)?.label
 
   return (
-    <Panel aria-label="Input" className="min-h-72 lg:min-h-0">
+    <Panel aria-label="Input" className="min-h-72 xl:min-h-0">
       <PanelHeader>
         <PanelTitle>Input</PanelTitle>
         <Select
@@ -119,7 +118,7 @@ export function InputPanel({
         </ErrorMessage>
       )}
 
-      <div className="relative flex min-h-40 flex-1 flex-col lg:min-h-16">
+      <div className="relative flex min-h-40 flex-1 flex-col xl:min-h-16">
         <textarea
           ref={textareaRef}
           // Not controlled by React: rewriting megabytes of text on every keystroke made typing lag.

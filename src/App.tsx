@@ -1,5 +1,14 @@
 import { FileDownIcon, MoonIcon, SunIcon } from "lucide-react"
-import { useCallback, useDeferredValue, useEffect, useEffectEvent, useMemo, useRef, useState } from "react"
+import {
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useEffectEvent,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react"
 
 import { InputPanel, type InputProblem } from "@/components/input-panel"
 import { OutputPanel } from "@/components/output-panel"
@@ -19,16 +28,21 @@ import {
   type InputFormat,
   type OutputFormat,
   type OutputOptions,
+  type ReadHint,
   type ReadResult,
+  type TableView,
 } from "@/core"
 import { useDebouncedValue } from "@/hooks/use-debounced-value"
 import { EXAMPLE_TABLE } from "@/lib/example"
-import { FileOpenError, formatForFile, readTextFile } from "@/lib/files"
+import { FileOpenError, hintForFile, readTextFile } from "@/lib/files"
 import { loadSettings, saveSettings } from "@/lib/settings"
 
 interface InputState {
   text: string
+  /** The choice in "Read input as". */
   format: InputFormat | "auto"
+  /** What the paste or file said about the text. */
+  hint: ReadHint
   /** Goes up each time the whole input is replaced, so choices about the old table don't carry over. */
   revision: number
   /** Typing into large text waits for a pause before reading; everything else reads right away. */
@@ -39,7 +53,10 @@ interface InputState {
 type ReadOutcome = { result: ReadResult; error: null } | { result: null; error: InputProblem } | null
 
 const DEBOUNCE_ABOVE_CHARS = 50_000
-const DEBOUNCE_MS = 250
+/** Bigger text takes longer to read, so it waits for a longer pause: 250 ms, up to 1 s at 5 MB. */
+const debounceFor = (chars: number) => Math.min(1000, 250 + Math.round(chars / 7000))
+/** A read error from typing waits for a pause, so it doesn't flash on and off mid-word. */
+const TYPED_ERROR_DELAY_MS = 600
 
 function describe(error: unknown): InputProblem {
   if (error instanceof TooMuchDataError) return { title: error.title, message: error.message }
@@ -47,10 +64,10 @@ function describe(error: unknown): InputProblem {
   return { title: "Something went wrong.", message: error instanceof Error ? error.message : String(error) }
 }
 
-function read(text: string, format: InputFormat | "auto"): ReadOutcome {
+function read(text: string, format: InputFormat | "auto", hint: ReadHint): ReadOutcome {
   if (text.trim() === "") return null
   try {
-    return { result: readTable(text, format), error: null }
+    return { result: readTable(text, format, hint), error: null }
   } catch (error) {
     return { result: null, error: describe(error) }
   }
@@ -64,7 +81,14 @@ function isOtherField(target: EventTarget | null, main: HTMLElement | null): boo
 }
 
 export function App() {
-  const [input, setInput] = useState<InputState>({ text: "", format: "auto", revision: 0, typed: false, note: null })
+  const [input, setInput] = useState<InputState>({
+    text: "",
+    format: "auto",
+    hint: {},
+    revision: 0,
+    typed: false,
+    note: null,
+  })
   const [actionError, setActionError] = useState<InputProblem | null>(null)
   const [headerOverride, setHeaderOverride] = useState<{ revision: number; value: boolean } | null>(null)
   const [settings, setSettings] = useState(loadSettings)
@@ -78,12 +102,19 @@ export function App() {
   // Reading happens in a deferred render, so typing stays responsive with big tables.
   const debounced = useDebouncedValue(
     input,
-    input.typed && input.text.length > DEBOUNCE_ABOVE_CHARS ? DEBOUNCE_MS : 0
+    input.typed && input.text.length > DEBOUNCE_ABOVE_CHARS ? debounceFor(input.text.length) : 0
   )
   const current = useDeferredValue(debounced)
   const pending = current !== input
-  const outcome = useMemo(() => read(current.text, current.format), [current.text, current.format])
+  const outcome = useMemo(
+    () => read(current.text, current.format, current.hint),
+    [current.text, current.format, current.hint]
+  )
   const bytes = useMemo(() => utf8ByteLength(current.text), [current.text])
+  const readError = useDebouncedValue(
+    outcome?.error ?? null,
+    outcome?.error && current.typed ? TYPED_ERROR_DELAY_MS : 0
+  )
 
   const table = outcome?.result?.table ?? null
   const hasHeader =
@@ -91,7 +122,21 @@ export function App() {
     (headerOverride?.revision === current.revision ? headerOverride.value : table.headerSuggested)
   const view = useMemo(() => (table ? toView(table, hasHeader) : null), [table, hasHeader])
 
-  const replaceInput = (text: string, format: InputFormat | "auto", note: string | null = null) => {
+  // Copy and Download use the newest input, even when the preview hasn't caught up with it yet.
+  const readLatest = useRef<() => TableView | null>(() => null)
+  useLayoutEffect(() => {
+    readLatest.current = () => {
+      if (!pending) return view
+      const latest = read(input.text, input.format, input.hint)
+      if (latest?.error) throw new Error(latest.error.message)
+      if (!latest) return null
+      const { table } = latest.result
+      return toView(table, headerOverride?.revision === input.revision ? headerOverride.value : table.headerSuggested)
+    }
+  })
+  const getView = useCallback(() => readLatest.current(), [])
+
+  const replaceInput = (text: string, hint: ReadHint, note: string | null = null) => {
     latestAction.current++
     setActionError(null)
     const textarea = textareaRef.current
@@ -100,7 +145,7 @@ export function App() {
       textarea.setSelectionRange(0, 0)
       textarea.scrollTo(0, 0)
     }
-    setInput((prev) => ({ text, format, revision: prev.revision + 1, typed: false, note }))
+    setInput((prev) => ({ text, format: "auto", hint, revision: prev.revision + 1, typed: false, note }))
   }
 
   const showActionError = (error: unknown) => {
@@ -114,7 +159,7 @@ export function App() {
     try {
       const text = await readTextFile(file)
       if (action !== latestAction.current) return
-      replaceInput(text, formatForFile(file.name), files.length > 1 ? `Opened ${file.name} only` : `Opened ${file.name}`)
+      replaceInput(text, hintForFile(file.name), files.length > 1 ? `Opened ${file.name} only` : `Opened ${file.name}`)
     } catch (error) {
       if (action === latestAction.current) showActionError(error)
     }
@@ -124,7 +169,7 @@ export function App() {
     try {
       const pasted = choosePaste(html, plain)
       assertTextSize(pasted.text)
-      replaceInput(pasted.text, pasted.format, pasted.fromRichTable ? "Converted from a copied table" : null)
+      replaceInput(pasted.text, pasted.hint, pasted.fromRichTable ? "Converted from a copied table" : null)
     } catch (error) {
       showActionError(error)
     }
@@ -152,8 +197,10 @@ export function App() {
 
     event.preventDefault()
     const html = data.getData("text/html")
-    // Spreadsheet apps can add a picture of the cells; only use files when there's no text.
-    if (plain === "" && html === "") {
+    // Spreadsheet apps can add a picture of the cells, so files are only used when there's no
+    // text, or when the text is just their names (as when copying a file on a Mac).
+    const names = Array.from(data.files, (file) => file.name)
+    if ((plain === "" && html === "") || (names.length > 0 && names.includes(plain.trim()))) {
       if (data.files.length > 0) void openFiles(data.files)
       return
     }
@@ -176,11 +223,12 @@ export function App() {
     let depth = 0
     let fallback: ReturnType<typeof setTimeout> | undefined
     // Drags that start on the page (like moving selected text) keep their normal behavior.
+    // Files always come from outside, and a file the page doesn't take would replace the page.
     let internal = false
-    const accepts = (event: DragEvent) =>
-      !internal &&
-      event.dataTransfer !== null &&
-      [...event.dataTransfer.types].some((type) => type === "Files" || type === "text/plain" || type === "text/html")
+    const accepts = (event: DragEvent) => {
+      const types = event.dataTransfer ? [...event.dataTransfer.types] : []
+      return types.includes("Files") || (!internal && (types.includes("text/plain") || types.includes("text/html")))
+    }
 
     const hide = () => {
       depth = 0
@@ -214,7 +262,10 @@ export function App() {
     }
     const handleDrop = (event: DragEvent) => {
       hide()
-      if (!accepts(event)) return
+      const accepted = accepts(event)
+      // In case the drag's dragend never arrived, as when its element was removed.
+      internal = false
+      if (!accepted) return
       event.preventDefault()
       onDrop(event.dataTransfer!)
     }
@@ -237,8 +288,9 @@ export function App() {
   }, [])
 
   const setHeader = useCallback(
-    (value: boolean) => setHeaderOverride({ revision: input.revision, value }),
-    [input.revision]
+    // The switch shows the table on screen, which can be older than the input.
+    (value: boolean) => setHeaderOverride({ revision: current.revision, value }),
+    [current.revision]
   )
   const setOutputFormat = useCallback(
     (outputFormat: OutputFormat) => setSettings((prev) => ({ ...prev, outputFormat })),
@@ -255,10 +307,10 @@ export function App() {
 
   return (
     <TooltipProvider delay={300}>
-      <div className="flex min-h-svh flex-col lg:h-svh lg:min-h-[40rem]">
+      <div className="flex min-h-svh flex-col xl:h-svh xl:min-h-[40rem]">
         <header className="flex h-11 shrink-0 items-center gap-3 border-b px-4">
           <div className="flex items-center gap-2">
-            <img src="/favicon.svg" alt="" className="size-5" />
+            <img src="/favicon.svg" alt="" className="size-5" draggable={false} />
             <h1 className="text-sm font-semibold tracking-tight">tableflip</h1>
           </div>
           <p className="hidden truncate text-xs text-muted-foreground md:block">
@@ -267,12 +319,13 @@ export function App() {
           <ThemeToggle />
         </header>
 
-        <main className="grid flex-1 gap-3 p-3 lg:min-h-0 lg:grid-cols-2 lg:grid-rows-[minmax(0,2fr)_minmax(0,3fr)]">
+        {/* Side by side from 1280px: the output panel needs about 620px to show all its tabs. */}
+        <main className="grid flex-1 gap-3 p-3 xl:min-h-0 xl:grid-cols-2 xl:grid-rows-[minmax(0,2fr)_minmax(0,3fr)]">
           <InputPanel
             text={input.text}
             format={input.format}
             result={outcome?.result ?? null}
-            readError={outcome?.error ?? null}
+            readError={readError}
             actionError={actionError}
             note={current.note}
             pending={pending}
@@ -281,27 +334,31 @@ export function App() {
             onTextChange={(text) => {
               latestAction.current++
               setActionError(null)
-              setInput((prev) => ({ ...prev, text, typed: true, note: text === "" ? null : prev.note }))
+              // Emptied by hand: whatever comes next is new, so forget what the last paste said.
+              setInput((prev) =>
+                text === "" ? { ...prev, text, hint: {}, typed: true, note: null } : { ...prev, text, typed: true }
+              )
             }}
             onFormatChange={(format) => setInput((prev) => ({ ...prev, format, typed: false }))}
             onOpenFiles={(files) => void openFiles(files)}
-            onExample={() => replaceInput(EXAMPLE_TABLE, "auto", "Example data")}
+            onExample={() => replaceInput(EXAMPLE_TABLE, {}, "Example data")}
             onClear={() => {
-              replaceInput("", "auto")
+              replaceInput("", {})
               textareaRef.current?.focus()
             }}
             onDismissActionError={() => setActionError(null)}
           />
           <PreviewPanel
-            className="max-h-96 lg:col-start-1 lg:row-start-2 lg:max-h-none"
+            className="max-h-96 xl:col-start-1 xl:row-start-2 xl:max-h-none"
             table={table}
             hasHeader={hasHeader}
             onHeaderChange={setHeader}
             stale={pending}
           />
           <OutputPanel
-            className="min-h-96 lg:col-start-2 lg:row-span-2 lg:row-start-1"
+            className="min-h-96 xl:col-start-2 xl:row-span-2 xl:row-start-1"
             view={view}
+            getView={getView}
             stale={pending}
             format={settings.outputFormat}
             options={settings.options}

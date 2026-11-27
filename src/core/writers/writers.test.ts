@@ -84,6 +84,14 @@ describe("Excel", () => {
     expect(html).toContain('a<br style="mso-data-placement:same-cell">b')
   })
 
+  it("marks spaces HTML would collapse", () => {
+    const { html } = excelClipboard(view([[" a  b", "c "]], false), { keepText: false })
+    const kept = (spaces: string) => `<span style='mso-spacerun:yes'>${spaces}</span>`
+    expect(html).toContain(`<td>${kept(" ")}a${kept("  ")}b</td><td>c${kept(" ")}</td>`)
+    expect(writeRichHtml(view([["a  b"]], false))).toContain(`a${kept("  ")}b`)
+    expect(writeHtml(view([["a  b"]], false), { inlineStyles: false })).toContain("<td>a  b</td>")
+  })
+
   it("leaves formatting to Excel when keep-as-text is off", () => {
     const { html } = excelClipboard(view([["007"]], false), { keepText: false })
     expect(html).toContain("<td>007</td>")

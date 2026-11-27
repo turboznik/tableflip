@@ -17,32 +17,45 @@ export function escapeHtml(text: string): string {
     .replace(/"/g, "&quot;")
 }
 
-function cellHtml(text: string, lineBreak: string): string {
-  return escapeHtml(text).replace(/\r\n|\r|\n/g, lineBreak)
+/** Spaces that HTML would collapse: runs of them, and any at the start or end of a line. */
+const COLLAPSED_SPACES = / {2,}|^ | $|(?<=[\r\n]) | (?=[\r\n])/g
+
+/**
+ * A cell's text as HTML. With `keepSpaces`, spaces HTML would collapse are
+ * marked the way Office does, so Excel, Word and Outlook keep them.
+ */
+function cellHtml(text: string, lineBreak: string, keepSpaces = false): string {
+  let html = escapeHtml(text)
+  if (keepSpaces) html = html.replace(COLLAPSED_SPACES, (spaces) => `<span style='mso-spacerun:yes'>${spaces}</span>`)
+  return html.replace(/\r\n|\r|\n/g, lineBreak)
 }
 
-function row(cells: string[], tag: "th" | "td", style: string | null): string {
+function row(cells: string[], tag: "th" | "td", style: string | null, keepSpaces: boolean): string {
   const open = style ? `<${tag} style="${style}">` : `<${tag}>`
-  return `<tr>${cells.map((cell) => `${open}${cellHtml(cell, "<br>")}</${tag}>`).join("")}</tr>`
+  return `<tr>${cells.map((cell) => `${open}${cellHtml(cell, "<br>", keepSpaces)}</${tag}>`).join("")}</tr>`
 }
 
-/** The table as readable HTML code, one row per line. */
-export function writeHtml(view: TableView, options: HtmlOptions): string {
-  const cellStyle = options.inlineStyles ? CELL_STYLE : null
-  const headerStyle = options.inlineStyles ? HEADER_STYLE : null
-  const lines = [options.inlineStyles ? `<table style="${TABLE_STYLE}">` : "<table>"]
+function tableHtml(view: TableView, inlineStyles: boolean, keepSpaces: boolean): string {
+  const cellStyle = inlineStyles ? CELL_STYLE : null
+  const headerStyle = inlineStyles ? HEADER_STYLE : null
+  const lines = [inlineStyles ? `<table style="${TABLE_STYLE}">` : "<table>"]
   if (view.header) {
-    lines.push("  <thead>", `    ${row(view.header, "th", headerStyle)}`, "  </thead>")
+    lines.push("  <thead>", `    ${row(view.header, "th", headerStyle, keepSpaces)}`, "  </thead>")
   }
   lines.push("  <tbody>")
-  for (const cells of view.body) lines.push(`    ${row(cells, "td", cellStyle)}`)
+  for (const cells of view.body) lines.push(`    ${row(cells, "td", cellStyle, keepSpaces)}`)
   lines.push("  </tbody>", "</table>")
   return lines.join("\n")
 }
 
+/** The table as readable HTML code, one row per line. */
+export function writeHtml(view: TableView, options: HtmlOptions): string {
+  return tableHtml(view, options.inlineStyles, false)
+}
+
 /** A styled table for pasting into Word, Outlook and other rich editors. */
 export function writeRichHtml(view: TableView): string {
-  return writeHtml(view, { inlineStyles: true })
+  return tableHtml(view, true, true)
 }
 
 /** A complete page, so a downloaded file opens properly in a browser. */
@@ -74,7 +87,7 @@ export function excelHtmlRows(view: TableView, keepText: boolean): string {
   return allRows(view)
     .map(
       (cells) =>
-        `<tr>${cells.map((cell) => `${open}${cellHtml(cell, lineBreak)}</td>`).join("")}</tr>`
+        `<tr>${cells.map((cell) => `${open}${cellHtml(cell, lineBreak, true)}</td>`).join("")}</tr>`
     )
     .join("")
 }

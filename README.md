@@ -81,8 +81,9 @@ Some unit tests check generated code with the real tools when they're
 installed: Python with pandas (set `PYTHON` to its interpreter) and the
 `typst` command. They're skipped otherwise.
 
-The browser tests build the app and start the server on port 4173 (set
-`E2E_PORT` to change it). Run `npx playwright install chromium` once first.
+The browser tests build the app, start the server on port 4173 (set
+`E2E_PORT` to change it) and run in Chromium and Firefox. Run
+`npx playwright install chromium firefox` once first.
 
 ### Layout
 

@@ -1,20 +1,23 @@
-import { MAX_INPUT_BYTES } from "./limits"
-import type { InputFormat } from "./read"
+import { MAX_INPUT_BYTES, TooMuchDataError } from "./limits"
+import type { ReadHint } from "./read"
 import { readHtml } from "./readers/html"
 import { toView } from "./table"
 import { writeDelimited } from "./writers/delimited"
 
 export interface PastedInput {
   text: string
-  /** The format to read the text as, or "auto" to detect it. */
-  format: InputFormat | "auto"
+  hint: ReadHint
   /** Whether a rich table was turned into tab-separated text. */
   fromRichTable: boolean
 }
 
-/** Spreadsheets put good tab-separated text on the clipboard; use it as is. */
+/**
+ * Spreadsheets put good tab-separated text on the clipboard; use it as is.
+ * Excel writes `<meta name=ProgId content=Excel.Sheet>`; browsers that clean
+ * up pasted HTML may add quotes or drop the Office namespaces.
+ */
 const SPREADSHEET_SOURCE =
-  /urn:schemas-microsoft-com:office:excel|google-sheets-html-origin|LibreOffice|ProgId content=Excel/i
+  /urn:schemas-microsoft-com:office:excel|google-sheets-html-origin|LibreOffice|ProgId["']?\s+content=["']?Excel/i
 
 /**
  * Picks what to use from a paste. Tables copied from web pages, Word or
@@ -22,25 +25,24 @@ const SPREADSHEET_SOURCE =
  * text. Spreadsheets and plain text are used as they are.
  */
 export function choosePaste(html: string, plain: string): PastedInput {
-  const usable =
-    html !== "" &&
-    html.length <= MAX_INPUT_BYTES * 4 &&
-    /<table[\s>]/i.test(html) &&
-    !SPREADSHEET_SOURCE.test(html.slice(0, 4000))
+  if (html !== "" && SPREADSHEET_SOURCE.test(html.slice(0, 4000))) {
+    return { text: plain, hint: { format: "delimited", delimiter: "\t", spreadsheet: true }, fromRichTable: false }
+  }
 
-  if (usable) {
+  if (html !== "" && html.length <= MAX_INPUT_BYTES * 4 && /<table[\s>]/i.test(html)) {
     try {
       const table = readHtml(html)
       if (table.rows.length > 0) {
         return {
           text: writeDelimited(toView(table, false), "\t", "\n"),
-          format: "delimited",
+          hint: { format: "delimited", delimiter: "\t", header: table.headerSuggested },
           fromRichTable: true,
         }
       }
-    } catch {
-      // Fall back to the plain text below.
+    } catch (error) {
+      if (error instanceof TooMuchDataError) throw error
+      // Otherwise fall back to the plain text below.
     }
   }
-  return { text: plain, format: "auto", fromRichTable: false }
+  return { text: plain, hint: {}, fromRichTable: false }
 }

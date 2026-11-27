@@ -94,7 +94,49 @@ describe("readDelimited", () => {
   })
 })
 
+describe("readDelimited with spreadsheet text", () => {
+  const read = (text: string) => readDelimited(text, { delimiter: "\t", spreadsheet: true }).rows
+
+  it("keeps quoted cells with line breaks together", () => {
+    expect(read('Tag\tNotes\r\nFT-101\t"line one\r\nline ""two"""\r\n')).toEqual([
+      ["Tag", "Notes"],
+      ["FT-101", 'line one\r\nline "two"'],
+    ])
+  })
+
+  it("keeps cells that only start with a quote as they are", () => {
+    expect(read('Tag\tSize\r\nFV-1\t2"\r\nFV-2\t"\r\nFV-3\t1"\r\n')).toEqual([
+      ["Tag", "Size"],
+      ["FV-1", '2"'],
+      ["FV-2", '"'],
+      ["FV-3", '1"'],
+    ])
+    expect(read('A\t"A" phase\r\nB\tnormal\r\n')).toEqual([
+      ["A", '"A" phase'],
+      ["B", "normal"],
+    ])
+    expect(read('"quoted"\tx')).toEqual([['"quoted"', "x"]])
+  })
+
+  it("keeps a single column with commas in one column", () => {
+    expect(read("Description\r\nValve, feed water\r\nPump, boiler feed\r\n")).toEqual([
+      ["Description"],
+      ["Valve, feed water"],
+      ["Pump, boiler feed"],
+    ])
+  })
+
+  it("keeps empty cells and rows", () => {
+    expect(read("a\t\tc\r\n\r\nd\t\t\r\n")).toEqual([["a", "", "c"], ["", "", ""], ["d", "", ""]])
+  })
+})
+
 describe("readJson", () => {
+  it("finds the rows in a wrapper with other lists", () => {
+    const table = readJson('{"data": [{"Tag": "FT-101"}, {"Tag": "PT-102"}], "errors": [], "pages": [1]}')
+    expect(table.rows).toEqual([["Tag"], ["FT-101"], ["PT-102"]])
+  })
+
   it("reads a list of objects, joining keys in order", () => {
     const table = readJson('[{"Tag":"FT-101","Range":10},{"Tag":"PT-102","Units":"psi"}]')
     expect(table.rows).toEqual([

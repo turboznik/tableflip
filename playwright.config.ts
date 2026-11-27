@@ -7,11 +7,19 @@ export default defineConfig({
   workers: 1,
   reporter: process.env.CI ? "github" : "list",
   use: {
-    ...devices["Desktop Chrome"],
     baseURL: `http://127.0.0.1:${port}`,
-    permissions: ["clipboard-read", "clipboard-write"],
     trace: "retain-on-failure",
   },
+  projects: [
+    {
+      name: "chromium",
+      use: {
+        ...devices["Desktop Chrome"],
+        permissions: ["clipboard-read", "clipboard-write"],
+      },
+    },
+    { name: "firefox", use: { ...devices["Desktop Firefox"] } },
+  ],
   webServer: {
     command: "npm run build && node server/index.ts",
     url: `http://127.0.0.1:${port}/healthz`,

@@ -16,6 +16,18 @@ export const INPUT_FORMATS: { id: InputFormat; label: string }[] = [
   { id: "markdown", label: "Markdown" },
 ]
 
+/** What's known about where the text came from, used instead of guessing. */
+export interface ReadHint {
+  /** From a file's extension. */
+  format?: InputFormat
+  /** For spreadsheet pastes and .tsv files. */
+  delimiter?: Delimiter
+  /** Text that Excel or Google Sheets put on the clipboard. */
+  spreadsheet?: boolean
+  /** Whether the source marked the first row as headers, like an HTML table's <th> cells. */
+  header?: boolean
+}
+
 export interface ReadResult {
   table: ParsedTable
   format: InputFormat
@@ -24,8 +36,9 @@ export interface ReadResult {
 }
 
 const MARKDOWN_DELIMITER_ROW =
-  /^[ \t]*\|?[ \t]*:?-+:?[ \t]*(?:\|[ \t]*:?-+:?[ \t]*)*\|?[ \t]*$/m
+  /^[ \t]*\|?[ \t]*:?-+:?[ \t]*(?:\|[ \t]*:?-+:?[ \t]*)*\|?[ \t]*$/gm
 const HTML_TABLE = /<table[\s>]/i
+const HTML_DOCUMENT = /^<(?:!doctype|html|head|body)[\s>]/i
 
 function parsesAsJson(text: string): boolean {
   try {
@@ -50,10 +63,13 @@ export function detectFormat(text: string): InputFormat {
     return "json"
   }
 
-  if (start === "<" && HTML_TABLE.test(trimmed)) return "html"
+  // A page without a table is still HTML, so it gets HTML's "no table" message.
+  if (start === "<" && (HTML_TABLE.test(trimmed) || HTML_DOCUMENT.test(trimmed))) return "html"
 
-  const delimiterRow = MARKDOWN_DELIMITER_ROW.exec(trimmed)
-  if (delimiterRow?.[0].includes("|")) return "markdown"
+  // Lines of dashes without a "|" are headings or rules, not a table's delimiter row.
+  for (const match of trimmed.matchAll(MARKDOWN_DELIMITER_ROW)) {
+    if (match[0].includes("|")) return "markdown"
+  }
 
   if (HTML_TABLE.test(trimmed) && /<\/t[dh]>/i.test(trimmed)) return "html"
 
@@ -64,20 +80,21 @@ export function detectFormat(text: string): InputFormat {
  * Reads input text as a table. Throws TooMuchDataError or TableReadError
  * with a message meant for people.
  */
-export function readTable(text: string, format: InputFormat | "auto"): ReadResult {
+export function readTable(text: string, format: InputFormat | "auto", hint: ReadHint = {}): ReadResult {
   assertTextSize(text)
-  const result = readAs(text, format === "auto" ? detectFormat(text) : format)
+  const result = readAs(text, format === "auto" ? (hint.format ?? detectFormat(text)) : format, hint)
   if (result.table.rows.length === 0 || result.table.columnCount === 0) {
     throw new TableReadError("This table is empty.")
   }
   return result
 }
 
-function readAs(text: string, used: InputFormat): ReadResult {
+function readAs(text: string, used: InputFormat, hint: ReadHint): ReadResult {
   switch (used) {
     case "delimited": {
-      const table = readDelimited(text)
-      return { table, format: used, delimiter: table.delimiter }
+      const { delimiter, ...table } = readDelimited(text, hint)
+      if (hint.header !== undefined) table.headerSuggested = hint.header
+      return { table, format: used, delimiter }
     }
     case "html":
       return { table: readHtml(text), format: used }

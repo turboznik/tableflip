@@ -1,4 +1,4 @@
-import { assertInputSize, type InputFormat } from "@/core"
+import { assertInputSize, assertTextSize, MAX_INPUT_BYTES, type ReadHint } from "@/core"
 
 export const ACCEPTED_FILES = ".csv,.tsv,.txt,.json,.jsonl,.ndjson,.md,.markdown,.html,.htm"
 
@@ -11,25 +11,27 @@ export class FileOpenError extends Error {
   }
 }
 
-export function formatForFile(name: string): InputFormat | "auto" {
+/** What a file's extension says about its contents. */
+export function hintForFile(name: string): ReadHint {
   const extension = /\.([^.]+)$/.exec(name)?.[1]?.toLowerCase()
   switch (extension) {
     case "csv":
+      return { format: "delimited" }
     case "tsv":
-      return "delimited"
+      return { format: "delimited", delimiter: "\t" }
     case "json":
-      return "json"
+      return { format: "json" }
     case "jsonl":
     case "ndjson":
-      return "jsonl"
+      return { format: "jsonl" }
     case "md":
     case "markdown":
-      return "markdown"
+      return { format: "markdown" }
     case "html":
     case "htm":
-      return "html"
+      return { format: "html" }
     default:
-      return "auto"
+      return {}
   }
 }
 
@@ -55,7 +57,8 @@ export async function readTextFile(file: File): Promise<string> {
       "tableflip can't open spreadsheet files. Select the cells in your spreadsheet, copy them, and paste them here."
     )
   }
-  assertInputSize(file.size)
+  // UTF-16 files take two bytes per character, so the text is measured after decoding.
+  if (file.size > MAX_INPUT_BYTES * 2) assertInputSize(file.size)
   let bytes: Uint8Array
   try {
     bytes = new Uint8Array(await file.arrayBuffer())
@@ -63,9 +66,11 @@ export async function readTextFile(file: File): Promise<string> {
     // Folders and files that were moved or deleted after being chosen.
     throw new FileOpenError("This file couldn't be read.")
   }
-  const text = decodeText(bytes)
+  const text = decodeText(bytes).replace(/^\uFEFF/, "")
   if (text.includes("\u0000")) {
     throw new FileOpenError("This doesn't look like a text file.")
   }
-  return text.replace(/^\uFEFF/, "")
+  if (text.trim() === "") throw new FileOpenError("This file is empty.")
+  assertTextSize(text)
+  return text
 }

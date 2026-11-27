@@ -20,8 +20,9 @@ reviewed for publishing.
   compression and a `/healthz` endpoint.
 - Tests: Vitest for the library (round trips, real pandas, Typst and marked
   checks when installed, a 100k-cell timing check) and Playwright for the UI
-  (paste paths, copy payloads, downloads, limits, file encodings, a file-read
-  race, drag and drop, typing in large input, theme).
+  in Chromium and Firefox (paste paths, copy payloads, downloads, limits, file
+  encodings, a file-read race, copying while input is still being read, drag
+  and drop, typing in large input, theme).
 
 ## Decisions
 
@@ -35,6 +36,12 @@ reviewed for publishing.
   fallback.
 - **Tables pasted from web pages or Word become tab-separated text.** Their
   plain-text versions are unreliable. Spreadsheet pastes use their own text.
+- **Pastes and files say what they are; detection is for plain text.**
+  Spreadsheet pastes are read as tab-separated text with the spreadsheet's own
+  quoting rule (only cells with line breaks are quoted, so a cell that starts
+  with `"`, like a ditto mark, stays as typed). `.tsv` files are read as
+  tab-separated, other files by extension, and tables from web pages keep the
+  header row they mark.
 - **Delimiter detection ignores blank lines** and treats text that no
   delimiter splits as one column (Papa Parse's own guess fails on two-column
   Excel copies, which end with a line break).
@@ -44,8 +51,14 @@ reviewed for publishing.
   each keystroke made typing lag; the app sets the value when it replaces the
   input.
 - **Output on screen is cut at 100,000 characters**; copy and download use all
-  of it. Each format's output is cached per table, so switching tabs back is
-  instant.
+  of it, and so does selecting all of the output and copying. Each format's
+  output is cached per table, so switching tabs back is instant.
+- **Copy and Download use the newest input.** Big input waits for a pause in
+  typing before it's read; a click in the meantime reads it right away.
+  Option changes (like a DAX table name) also update the screen in the
+  background, so typing stays quick with big tables.
+- **Side by side from 1280 px.** The output tabs need about 620 px; narrower
+  windows stack the panels.
 
 ## Performance (100,000 cells, 1 MB of tab-separated text)
 
@@ -70,3 +83,7 @@ See [README.md](README.md). In short: `npm install`, `npm run dev`;
   Windows; the clipboard formats follow what those apps produce and accept.
 - Safari may not fire paste events unless a text field has focus; clicking
   the input first works everywhere.
+- A spreadsheet copy of a single column where cells are just `"` (ditto
+  marks) can still be misread: the copied text alone can't tell two such
+  cells apart from one quoted cell with a line break. With more than one
+  column it reads correctly.

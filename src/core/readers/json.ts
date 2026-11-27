@@ -134,14 +134,13 @@ export function readJson(text: string): ParsedTable {
   if (isPlainObject(data)) {
     const values = Object.values(data)
     const lists = values.filter(Array.isArray)
+    const rowLists = lists.filter((list) => list.some((item) => isPlainObject(item) || Array.isArray(item)))
 
-    // {"data": [...]}: the usual API wrapper around a list of rows.
-    if (lists.length === 1 && lists[0].some((item) => isPlainObject(item) || Array.isArray(item))) {
-      return tableFromItems(lists[0])
-    }
+    // {"data": [...], "errors": []}: the usual API wrapper around a list of rows.
+    if (rowLists.length === 1) return tableFromItems(rowLists[0])
 
-    // {"Tag": [...], "Range": [...]}: one list per column.
-    if (values.length > 0 && lists.length === values.length) {
+    // {"Tag": [...], "Range": [...]}: one list of plain values per column.
+    if (values.length > 0 && lists.length === values.length && rowLists.length === 0) {
       const height = Math.max(...lists.map((list) => list.length))
       assertCellCount(height + 1, values.length)
       const header = Object.keys(data)

@@ -47,9 +47,9 @@ app.use(
   "*",
   serveStatic({
     root: dist,
-    onFound: (path, c) => {
+    onFound: (_path, c) => {
       // Built assets have a content hash in their names, so they never change.
-      const immutable = path.includes("/assets/")
+      const immutable = c.req.path.startsWith("/assets/")
       c.header("Cache-Control", immutable ? "public, max-age=31536000, immutable" : "no-cache")
     },
   })
