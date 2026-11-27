@@ -81,20 +81,24 @@ export function allRows(view: TableView): string[][] {
 
 /**
  * Column names that are safe to use as keys: blanks get "Column N" and
- * duplicates get a numeric suffix.
+ * duplicates get a numeric suffix. Names from the header are kept where they
+ * can be, so made-up names never take one.
  */
-export function columnNames(view: TableView): string[] {
-  const names: string[] = []
+export function columnNames(view: TableView, { ignoreCase = false } = {}): string[] {
+  const fold = (name: string) => (ignoreCase ? name.toLowerCase() : name)
+  const given = Array.from({ length: view.columnCount }, (_, i) => view.header?.[i]?.trim() ?? "")
+  const reserved = new Set(given.filter(Boolean).map(fold))
   const used = new Set<string>()
-  for (let i = 0; i < view.columnCount; i++) {
-    const base = view.header?.[i]?.trim() || `Column ${i + 1}`
-    let name = base
-    let suffix = 2
-    while (used.has(name)) name = `${base}_${suffix++}`
-    used.add(name)
-    names.push(name)
-  }
-  return names
+  return given.map((name, i) => {
+    let candidate = name || `Column ${i + 1}`
+    if (!name || used.has(fold(name))) {
+      const base = candidate
+      let suffix = 2
+      while (used.has(fold(candidate)) || reserved.has(fold(candidate))) candidate = `${base}_${suffix++}`
+    }
+    used.add(fold(candidate))
+    return candidate
+  })
 }
 
 const NUMBER_LIKE = /^-?\d+(?:[.,]\d+)*%?$/

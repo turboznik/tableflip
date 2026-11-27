@@ -43,22 +43,20 @@ app.use(
 
 app.get("/healthz", (c) => c.text("ok"))
 
-app.use(
-  "*",
-  serveStatic({
-    root: dist,
-    onFound: (_path, c) => {
-      // Built assets have a content hash in their names, so they never change.
-      const immutable = c.req.path.startsWith("/assets/")
-      c.header("Cache-Control", immutable ? "public, max-age=31536000, immutable" : "no-cache")
-    },
-  })
-)
+// Set once the response exists: serveStatic builds its response before calling onFound.
+app.use("*", async (c, next) => {
+  await next()
+  if (!c.res.ok) return
+  // Built assets have a content hash in their names, so they never change. The page is checked each time.
+  const immutable = c.req.path.startsWith("/assets/")
+  c.res.headers.set("Cache-Control", immutable ? "public, max-age=31536000, immutable" : "no-cache")
+})
+
+app.use("*", serveStatic({ root: dist }))
 
 // Paths that look like files and weren't found are real 404s; anything else gets the app.
 app.get("*", async (c, next) => {
   if (extname(c.req.path) !== "") return c.notFound()
-  c.header("Cache-Control", "no-cache")
   return serveStatic({ root: dist, path: "index.html" })(c, next)
 })
 

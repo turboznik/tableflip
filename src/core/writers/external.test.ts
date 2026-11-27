@@ -87,4 +87,15 @@ describe("Markdown output", () => {
       expect(table.rows[1][3].text).toBe("line one<br>line two tab")
     }
   })
+
+  it("keeps backslashes before pipes and punctuation", () => {
+    const cells = [String.raw`C:\data\|x`, String.raw`a\*b`, "ok"]
+    const markdown = writeMarkdown(toView(makeTable([["a", "b", "c"], cells], true), true), { align: false })
+    const table = marked.lexer(markdown).find((token) => token.type === "table") as Tokens.Table
+    expect(table.rows[0].map((cell) => marked.parseInline(cell.text))).toEqual([
+      String.raw`C:\data\|x`,
+      String.raw`a\*b`,
+      "ok",
+    ])
+  })
 })

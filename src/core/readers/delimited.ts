@@ -111,6 +111,8 @@ function eachSpreadsheetRow(text: string, visit: (row: string[]) => void): void 
   visit(row)
 }
 
+const SEP_LINE = /^sep=([,;|\t])[ \t]*(?:\r\n|\r|\n)/i
+
 export interface DelimitedOptions {
   /** Leave out to detect it. */
   delimiter?: Delimiter
@@ -126,24 +128,30 @@ export function readDelimited(
   text: string,
   { delimiter, spreadsheet = false }: DelimitedOptions = {}
 ): DelimitedTable {
-  const source = text.replace(/^\uFEFF/, "")
+  let source = text.replace(/^\uFEFF/, "")
+  // Excel's "sep=;" first line says which delimiter the file uses.
+  const declared = SEP_LINE.exec(source)
+  if (declared) source = source.slice(declared[0].length)
   const rows: string[][] = []
   let rowCount = 0
   let widest = 0
   let lastFilledRow = -1
   let storing = true
   // Text that no delimiter splits is one column; tab is the least likely to appear in it.
-  const used = delimiter ?? guessDelimiter(source) ?? "\t"
+  const used = delimiter ?? (declared?.[1] as Delimiter | undefined) ?? guessDelimiter(source) ?? "\t"
 
   // Streams rows so a huge paste is counted without keeping every row around.
   const visit = (row: string[]) => {
     const index = rowCount++
-    if (row.length === 1 && row[0] === "") {
+    // Empty cells at the end of a row, like those from a trailing comma, aren't columns.
+    let width = row.length
+    while (width > 0 && row[width - 1] === "") width--
+    if (width === 0) {
       if (storing) rows.push(row)
       return
     }
     lastFilledRow = index
-    widest = Math.max(widest, row.length)
+    widest = Math.max(widest, width)
     if (storing) {
       rows.push(row)
       if (rows.length * widest > MAX_CELLS) storing = false

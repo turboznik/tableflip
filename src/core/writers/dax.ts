@@ -44,7 +44,8 @@ function daxValue(value: string, type: DaxType): string {
 
 /** A Power BI calculated table using DATATABLE. */
 export function writeDax(view: TableView, options: DaxOptions): string {
-  const names = columnNames(view)
+  // Power BI column names ignore case.
+  const names = columnNames(view, { ignoreCase: true })
   const types: DaxType[] = options.detectTypes
     ? columnKinds(view.body, view.columnCount).map((kind, i) =>
         daxType(

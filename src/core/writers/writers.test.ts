@@ -50,7 +50,30 @@ describe("columnNames", () => {
           ["1", "2", "3", "4"],
         ])
       )
-    ).toEqual(["a", "Column 2", "a_2", "a_2_2"])
+    ).toEqual(["a", "Column 2", "a_3", "a_2"])
+  })
+
+  it("keeps header names that look made up", () => {
+    expect(
+      columnNames(
+        view([
+          ["Column 2", "", "x"],
+          ["1", "2", "3"],
+        ])
+      )
+    ).toEqual(["Column 2", "Column 2_2", "x"])
+  })
+
+  it("can treat names that differ only in case as the same", () => {
+    expect(
+      columnNames(
+        view([
+          ["Tag", "TAG"],
+          ["1", "2"],
+        ]),
+        { ignoreCase: true }
+      )
+    ).toEqual(["Tag", "TAG_2"])
   })
 })
 
@@ -103,6 +126,12 @@ describe("Excel", () => {
   it("escapes HTML in cells", () => {
     const { html } = excelClipboard(view([["<b>&</b>"]], false), { keepText: false })
     expect(html).toContain("<td>&lt;b&gt;&amp;&lt;/b&gt;</td>")
+  })
+
+  it("quotes only cells with line breaks or tabs in its text, like Excel", () => {
+    expect(writeExcelText(view([['12" pipe', '"A" phase', "a\nb"]], false))).toBe(
+      '12" pipe\t"A" phase\t"a\nb"'
+    )
   })
 })
 
@@ -194,6 +223,12 @@ describe("Markdown", () => {
   it("round-trips through the reader", () => {
     const text = writeMarkdown(instruments, { align: true })
     expect(readMarkdown(text).rows).toEqual([instruments.header, ...instruments.body])
+  })
+
+  it("escapes backslashes before punctuation, so cells read back as written", () => {
+    const cells = [String.raw`C:\data\|x`, String.raw`a\*b`, String.raw`C:\data\ `.trim()]
+    const markdown = writeMarkdown(view([["a", "b", "c"], cells]), { align: false })
+    expect(readMarkdown(markdown).rows[1]).toEqual(cells)
   })
 })
 
@@ -299,6 +334,11 @@ describe("ASCII", () => {
       ["┌───┬───┐", "│ a │ b │", "│   │ c │", "└───┴───┘"].join("\n")
     )
   })
+
+  it("draws a cell with many thousands of lines", () => {
+    const lines = writeAscii(view([["a\n".repeat(200_000)]], false), { style: "box" }).split("\n")
+    expect(lines.length).toBeGreaterThan(200_000)
+  })
 })
 
 describe("DAX", () => {
@@ -338,6 +378,17 @@ describe("DAX", () => {
 
   it("writes empty data for a header-only table", () => {
     expect(writeDax(view([["a"]]), { tableName: "T", detectTypes: true })).toContain("    {}")
+  })
+
+  it("makes column names unique ignoring case, as Power BI does", () => {
+    const dax = writeDax(
+      view([
+        ["Tag", "TAG"],
+        ["a", "b"],
+      ]),
+      DEFAULT_OPTIONS.dax
+    )
+    expect(dax).toContain('"TAG_2", STRING')
   })
 })
 

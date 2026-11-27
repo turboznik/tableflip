@@ -2,7 +2,8 @@
 import { describe, expect, it } from "vitest"
 
 import { TooMuchDataError } from "../limits"
-import { TableReadError } from "../table"
+import { makeTable, TableReadError, toView } from "../table"
+import { writeRichHtml } from "../writers/html"
 import { readHtml } from "./html"
 
 describe("readHtml", () => {
@@ -78,5 +79,44 @@ describe("readHtml", () => {
     expect(() => readHtml(`<table>${'<tr><td colspan="99999">x</td></tr>'.repeat(200)}</table>`)).toThrow(
       TooMuchDataError
     )
+  })
+
+  it("keeps rowspan=0 in its section and stays within the cell limit", () => {
+    const table = readHtml(
+      "<table><thead><tr><th rowspan=0>A</th><th>B</th></tr></thead><tbody><tr><td>1</td><td>2</td></tr></tbody></table>"
+    )
+    expect(table.rows).toEqual([
+      ["A", "B"],
+      ["1", "2"],
+    ])
+
+    const started = performance.now()
+    expect(() => readHtml(`<table>${"<tr><td rowspan=0>x</td></tr>".repeat(3000)}</table>`)).toThrow(
+      TooMuchDataError
+    )
+    expect(() => readHtml(`<table>${"<tr><td rowspan=1000>x</td></tr>".repeat(3000)}</table>`)).toThrow(
+      TooMuchDataError
+    )
+    expect(performance.now() - started).toBeLessThan(3000)
+  })
+
+  it("reads Word lists, preformatted text and kept spaces, and skips hidden text", () => {
+    const table = readHtml(`<table><tr>
+      <td><p style="mso-list:l0 level1 lfo1"><span style="font-family:Symbol;mso-list:Ignore">·<span style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp; </span></span>Open valve</p>
+        <p style="mso-list:l0 level1 lfo1"><span style="mso-list:Ignore">2.<span>&nbsp;&nbsp;</span></span>Check flow</p></td>
+      <td><pre>a   b\n  c</pre></td>
+      <td><span style="mso-spacerun:yes">  </span>TT-1<span style="mso-spacerun:yes">  </span>x</td>
+      <td><span style="display:none">0042</span>42<span hidden>!</span></td>
+      <td><span>FT-101 </span> <span>spare</span><svg><title>icon</title></svg></td>
+    </tr></table>`)
+    expect(table.rows).toEqual([
+      ["• Open valve\n2. Check flow", "a   b\n  c", "  TT-1  x", "42", "FT-101 spare"],
+    ])
+  })
+
+  it("reads back tableflip's own rich copy exactly", () => {
+    const cells = ["  TT-1", "a  b", "c ", "line 1\nline 2"]
+    const view = toView(makeTable([cells, cells], false), false)
+    expect(readHtml(writeRichHtml(view)).rows).toEqual([cells, cells])
   })
 })

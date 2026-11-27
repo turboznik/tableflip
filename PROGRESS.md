@@ -22,7 +22,8 @@ reviewed for publishing.
   checks when installed, a 100k-cell timing check) and Playwright for the UI
   in Chromium and Firefox (paste paths, copy payloads, downloads, limits, file
   encodings, a file-read race, copying while input is still being read, drag
-  and drop, typing in large input, theme).
+  and drop, typing in large input, undo after a paste, pasted pictures,
+  pasting back a Copy for Excel, theme).
 
 ## Decisions
 
@@ -30,7 +31,10 @@ reviewed for publishing.
   back the same way. This keeps the app small and avoids an XLSX dependency.
 - **Copy for Excel writes HTML as well as text.** The HTML carries
   `mso-number-format:"\@"` so Excel keeps values like `1-2` and `007` as typed
-  ("Keep values as text", on by default).
+  ("Keep values as text", on by default). The text quotes cells the way Excel
+  does (only cells with line breaks or tabs), so `12" pipe` stays as it is in
+  plain-text apps. The HTML has a `generator` meta tag, so pasting it back
+  into tableflip reads the HTML, which keeps every cell exactly.
 - **Copying uses the copy event.** Chromium's async Clipboard API rewrites
   HTML and would drop the Excel formatting hints; the async API is only a
   fallback.
@@ -41,18 +45,27 @@ reviewed for publishing.
   quoting rule (only cells with line breaks are quoted, so a cell that starts
   with `"`, like a ditto mark, stays as typed). `.tsv` files are read as
   tab-separated, other files by extension, and tables from web pages keep the
-  header row they mark.
+  header row they mark. Typing over all of the text forgets what the paste
+  said. LibreOffice pastes are read as HTML: Calc and Writer tables look the
+  same on the clipboard, and both read well that way.
 - **Delimiter detection ignores blank lines** and treats text that no
   delimiter splits as one column (Papa Parse's own guess fails on two-column
   Excel copies, which end with a line break).
-- **JSON numbers keep their exact text** (the `JSON.parse` reviver's source
-  text), so large IDs and `1.50` survive a round trip.
+- **JSON is read with a small parser of its own.** `JSON.parse` puts keys like
+  `"2024"` first and turns `1.50` into `1.5`; the parser keeps keys in the
+  order they were written and numbers as written, in every browser. Invalid
+  JSON still gets the browser's own error message.
 - **The input textarea is uncontrolled.** React rewriting megabytes of text on
   each keystroke made typing lag; the app sets the value when it replaces the
   input.
 - **Output on screen is cut at 100,000 characters**; copy and download use all
   of it, and so does selecting all of the output and copying. Each format's
   output is cached per table, so switching tabs back is instant.
+- **Ctrl+Z undoes a paste, file, example or Clear.** The app sets the text
+  directly, which the browser can't undo (`execCommand("insertText")` would
+  keep the browser's undo, but took over a second for 100 KB). So the app
+  keeps the input it replaced and handles Ctrl+Z and Ctrl+Shift+Z (or Ctrl+Y)
+  itself until the next edit.
 - **Copy and Download use the newest input.** Big input waits for a pause in
   typing before it's read; a click in the meantime reads it right away.
   Option changes (like a DAX table name) also update the screen in the
@@ -86,4 +99,8 @@ See [README.md](README.md). In short: `npm install`, `npm run dev`;
 - A spreadsheet copy of a single column where cells are just `"` (ditto
   marks) can still be misread: the copied text alone can't tell two such
   cells apart from one quoted cell with a line break. With more than one
-  column it reads correctly.
+  column it reads correctly, unless a ditto mark ends one row and another
+  starts the next.
+- Markdown output escapes pipes and backslashes but not inline markup, so a
+  cell like `*note*` shows in italics once rendered. This keeps the Markdown
+  readable as text.

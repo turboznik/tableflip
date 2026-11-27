@@ -35,6 +35,7 @@ import {
 import { useDebouncedValue } from "@/hooks/use-debounced-value"
 import { EXAMPLE_TABLE } from "@/lib/example"
 import { FileOpenError, hintForFile, readTextFile } from "@/lib/files"
+import { isMac } from "@/lib/platform"
 import { loadSettings, saveSettings } from "@/lib/settings"
 
 interface InputState {
@@ -73,6 +74,18 @@ function read(text: string, format: InputFormat | "auto", hint: ReadHint): ReadO
   }
 }
 
+/** Ctrl+Z (⌘Z on a Mac) undoes; Ctrl+Shift+Z, or Ctrl+Y on Windows and Linux, redoes. */
+function historyKey(event: KeyboardEvent): "undo" | "redo" | null {
+  if (!(isMac ? event.metaKey : event.ctrlKey) || event.altKey) return null
+  // Keyboard layouts without Latin letters still have the key where Z is.
+  const key = /^[a-z]$/i.test(event.key)
+    ? event.key.toLowerCase()
+    : event.code.replace(/^Key/, "").toLowerCase()
+  if (key === "z") return event.shiftKey ? "redo" : "undo"
+  if (key === "y" && !isMac && !event.shiftKey) return "redo"
+  return null
+}
+
 /** Other fields (like the DAX table name) keep normal paste behavior. */
 function isOtherField(target: EventTarget | null, main: HTMLElement | null): boolean {
   if (!(target instanceof HTMLElement) || target === main) return false
@@ -96,6 +109,15 @@ export function App() {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   /** Counts input changes, so a slow file read can't overwrite something newer. */
   const latestAction = useRef(0)
+  const latestInput = useRef(input)
+  useLayoutEffect(() => {
+    latestInput.current = input
+  })
+  /**
+   * The input from before the last paste, file, example or clear. The browser's own undo
+   * can't bring it back, since the app sets the text directly.
+   */
+  const replaced = useRef<{ input: InputState; undone: boolean } | null>(null)
 
   useEffect(() => saveSettings(settings), [settings])
 
@@ -139,16 +161,21 @@ export function App() {
   })
   const getView = useCallback(() => readLatest.current(), [])
 
-  const replaceInput = (text: string, hint: ReadHint, note: string | null = null) => {
+  const showInput = (next: Omit<InputState, "revision">) => {
     latestAction.current++
     setActionError(null)
     const textarea = textareaRef.current
     if (textarea) {
-      textarea.value = text
+      textarea.value = next.text
       textarea.setSelectionRange(0, 0)
       textarea.scrollTo(0, 0)
     }
-    setInput((prev) => ({ text, format: "auto", hint, revision: prev.revision + 1, typed: false, note }))
+    setInput((prev) => ({ ...next, revision: prev.revision + 1 }))
+  }
+
+  const replaceInput = (text: string, hint: ReadHint, note: string | null = null) => {
+    replaced.current = { input: latestInput.current, undone: false }
+    showInput({ text, format: "auto", hint, typed: false, note })
   }
 
   const showActionError = (error: unknown) => {
@@ -175,6 +202,8 @@ export function App() {
   const takeText = (html: string, plain: string) => {
     try {
       const pasted = choosePaste(html, plain)
+      // Nothing to read, like a picture copied from a web page without its file.
+      if (pasted.text.trim() === "") return
       assertTextSize(pasted.text)
       replaceInput(pasted.text, pasted.hint, pasted.fromRichTable ? "Converted from a copied table" : null)
     } catch (error) {
@@ -205,14 +234,32 @@ export function App() {
     event.preventDefault()
     const html = data.getData("text/html")
     // Spreadsheet apps can add a picture of the cells, so files are only used when there's no
-    // text, or when the text is just their names (as when copying a file on a Mac).
+    // text, or when the text is just their names (as when copying a file on a Mac). A picture
+    // copied from a web page or document comes with HTML, but not a table.
     const names = Array.from(data.files, (file) => file.name)
-    if ((plain === "" && html === "") || (names.length > 0 && names.includes(plain.trim()))) {
-      if (data.files.length > 0) void openFiles(data.files)
+    const textless = plain.trim() === "" && !/<table[\s>]/i.test(html)
+    if (data.files.length > 0 && (textless || names.includes(plain.trim()))) {
+      void openFiles(data.files)
       return
     }
     takeText(html, plain)
   })
+
+  const onKeyDown = useEffectEvent((event: KeyboardEvent) => {
+    const saved = replaced.current
+    const action = historyKey(event)
+    if (!saved || !action || isOtherField(event.target, textareaRef.current)) return
+    if ((action === "undo") === saved.undone) return
+    event.preventDefault()
+    replaced.current = { input: latestInput.current, undone: !saved.undone }
+    showInput({ ...saved.input, typed: false })
+  })
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => onKeyDown(event)
+    document.addEventListener("keydown", handleKeyDown)
+    return () => document.removeEventListener("keydown", handleKeyDown)
+  }, [])
 
   const onDrop = useEffectEvent((data: DataTransfer) => {
     if (data.files.length > 0) void openFiles(data.files)
@@ -342,13 +389,14 @@ export function App() {
             pending={pending}
             bytes={bytes}
             textareaRef={textareaRef}
-            onTextChange={(text) => {
+            onTextChange={(text, replacedAll) => {
               latestAction.current++
+              replaced.current = null
               setActionError(null)
-              // Emptied by hand: whatever comes next is new, so forget what the last paste said.
+              // Emptied or typed over: whatever comes next is new, so forget what the last paste said.
               setInput((prev) =>
-                text === ""
-                  ? { ...prev, text, hint: {}, typed: true, note: null }
+                text === "" || replacedAll
+                  ? { ...prev, text, hint: {}, revision: prev.revision + 1, typed: true, note: null }
                   : { ...prev, text, typed: true }
               )
             }}

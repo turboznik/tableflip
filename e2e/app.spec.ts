@@ -134,6 +134,63 @@ test("pasting replaces the whole input, but edits part of it normally", async ({
   expect(cancelled).toBe(false)
 })
 
+test("Ctrl+Z brings back what a paste or Clear replaced", async ({ page }) => {
+  await input(page).focus()
+  await page.keyboard.type("a,b\n1,2")
+  await page.keyboard.press("ControlOrMeta+a")
+  await paste(page, { "text/plain": TSV }, "textarea")
+  await expect(input(page)).toHaveValue(TSV)
+
+  await page.keyboard.press("ControlOrMeta+z")
+  await expect(input(page)).toHaveValue("a,b\n1,2")
+  await expect(page.getByRole("region", { name: "Preview" })).toContainText("× 2 columns")
+  await page.keyboard.press("ControlOrMeta+Shift+z")
+  await expect(input(page)).toHaveValue(TSV)
+
+  await page.getByRole("button", { name: "Clear input" }).click()
+  await expect(input(page)).toHaveValue("")
+  await page.keyboard.press("ControlOrMeta+z")
+  await expect(input(page)).toHaveValue(TSV)
+  await expect(page.getByRole("region", { name: "Preview" })).toContainText("2 rows × 3 columns")
+})
+
+test("typing over a paste reads the new text on its own", async ({ page }) => {
+  await paste(page, { "text/plain": TSV, "text/html": EXCEL_HTML })
+  await expect(page.getByRole("region", { name: "Preview" })).toContainText("2 rows × 3 columns")
+  await input(page).focus()
+  await page.keyboard.press("ControlOrMeta+a")
+  await page.keyboard.type("Tag,Range\nFT-1,0-250")
+  await expect(status(page)).toContainText("comma-separated")
+  await expect(page.getByRole("region", { name: "Preview" })).toContainText("1 row × 2 columns")
+})
+
+test("pasting a picture says it can't be read and keeps the input", async ({ page }) => {
+  await page.getByRole("button", { name: "Example", exact: true }).click()
+  const dispatched = await page.evaluate(async () => {
+    const canvas = document.createElement("canvas")
+    const blob = await new Promise<Blob>((resolve) => canvas.toBlob((png) => resolve(png!), "image/png"))
+    const transfer = new DataTransfer()
+    transfer.items.add(new File([blob], "image.png", { type: "image/png" }))
+    // A picture copied from a web page also comes with HTML.
+    transfer.setData("text/html", '<img src="https://example.com/chart.png">')
+    const event = new ClipboardEvent("paste", { clipboardData: transfer, bubbles: true, cancelable: true })
+    if (!event.clipboardData?.files.length) {
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })])
+      return false
+    }
+    document.body.dispatchEvent(event)
+    return true
+  })
+  if (!dispatched) await page.keyboard.press("ControlOrMeta+v")
+  await expect(page.getByRole("alert")).toContainText("tableflip can't read tables in pictures.")
+  await expect(input(page)).not.toHaveValue("")
+
+  // Without a file there's nothing to read, so the input stays as it was.
+  await page.getByRole("button", { name: "Dismiss" }).click()
+  await paste(page, { "text/html": '<img src="https://example.com/chart.png">' })
+  await expect(input(page)).not.toHaveValue("")
+})
+
 test("real keyboard paste works", async ({ page }) => {
   await page.evaluate((text) => navigator.clipboard.writeText(text), TSV)
   await page.locator("body").click({ position: { x: 5, y: 5 } })
@@ -224,6 +281,21 @@ test("Copy for Excel puts text and Excel-ready HTML on the clipboard", async ({ 
   await page.getByRole("switch", { name: "Keep values as text" }).click()
   await page.getByRole("button", { name: "Copy for Excel" }).click()
   expect((await copied(page))["text/html"]).not.toContain("mso-number-format")
+})
+
+test("pasting back a Copy for Excel keeps every cell", async ({ page }) => {
+  await paste(page, { "text/plain": '[{"Size": "12\\" pipe", "Phase": "\\"A\\" phase"}]' })
+  await recordCopies(page)
+  await page.getByRole("button", { name: "Copy for Excel" }).click()
+  const data = await copied(page)
+  // Like Excel's own copies: inch marks and quotes aren't quoted.
+  expect(data["text/plain"]).toBe('Size\tPhase\r\n12" pipe\t"A" phase')
+
+  await paste(page, data)
+  await expect(status(page)).toContainText("Converted from a copied table")
+  const preview = page.getByRole("region", { name: "Preview" })
+  await expect(preview.getByRole("cell", { name: '12" pipe', exact: true })).toBeVisible()
+  await expect(preview.getByRole("cell", { name: '"A" phase', exact: true })).toBeVisible()
 })
 
 test("HTML has a rich copy and a code copy", async ({ page }) => {
@@ -363,6 +435,15 @@ test("refuses spreadsheet and binary files", async ({ page }) => {
     buffer: Buffer.from([0x89, 0x50, 0x00, 0x01]),
   })
   await expect(page.getByRole("alert")).toContainText("This doesn't look like a text file.")
+
+  for (const [name, message] of [
+    ["specs.docx", "tableflip can't open documents."],
+    ["datasheet.pdf", "tableflip can't open PDF files."],
+    ["panel.jpg", "tableflip can't read tables in pictures."],
+  ]) {
+    await chooser.setInputFiles({ name, mimeType: "application/octet-stream", buffer: Buffer.from("x") })
+    await expect(page.getByRole("alert")).toContainText(message)
+  }
 
   await chooser.setInputFiles({
     name: "empty.csv",

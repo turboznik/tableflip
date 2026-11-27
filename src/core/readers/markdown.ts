@@ -2,28 +2,34 @@ import { assertCellCount } from "../limits"
 import { makeTable, TableReadError, type ParsedTable } from "../table"
 
 const DELIMITER_CELL = /^\s*:?-+:?\s*$/
+const ASCII_PUNCTUATION = /[!-/:-@[-`{-~]/
 
-/** Splits a table row on unescaped pipes, as GitHub does (even in code spans). */
+/**
+ * Splits a table row on unescaped pipes, as GitHub does (even in code spans).
+ * Backslash escapes like \| and \* become the character they escape.
+ */
 export function splitMarkdownRow(line: string): string[] {
   let text = line.trim()
   if (text.startsWith("|")) text = text.slice(1)
-  if (text.endsWith("|") && !text.endsWith("\\|")) text = text.slice(0, -1)
 
   const cells: string[] = []
   let current = ""
+  let endsWithPipe = false
   for (let i = 0; i < text.length; i++) {
     const char = text[i]
-    if (char === "\\" && text[i + 1] === "|") {
-      current += "|"
-      i++
+    endsWithPipe = false
+    if (char === "\\" && ASCII_PUNCTUATION.test(text[i + 1] ?? "")) {
+      current += text[++i]
     } else if (char === "|") {
       cells.push(current)
       current = ""
+      endsWithPipe = true
     } else {
       current += char
     }
   }
-  cells.push(current)
+  // A pipe at the end closes the row rather than starting another cell.
+  if (!endsWithPipe) cells.push(current)
   return cells.map((cell) => cell.trim().replace(/<br\s*\/?>/gi, "\n"))
 }
 

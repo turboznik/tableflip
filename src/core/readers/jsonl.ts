@@ -1,9 +1,10 @@
 import { TableReadError, type ParsedTable } from "../table"
 import { parseJson, tableFromItems } from "./json"
+import type { JsonValue } from "./json-parse"
 
 /** Reads JSON Lines (NDJSON): one JSON value per line. */
 export function readJsonLines(text: string): ParsedTable {
-  const items: unknown[] = []
+  const items: JsonValue[] = []
   const lines = text.split(/\r?\n/)
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim()

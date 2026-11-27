@@ -14,10 +14,13 @@ export interface PastedInput {
 /**
  * Spreadsheets put good tab-separated text on the clipboard; use it as is.
  * Excel writes `<meta name=ProgId content=Excel.Sheet>`; browsers that clean
- * up pasted HTML may add quotes or drop the Office namespaces.
+ * up pasted HTML may add quotes or drop the Office namespaces. LibreOffice
+ * isn't listed: Calc and Writer tables look the same, and both read well as HTML.
  */
 const SPREADSHEET_SOURCE =
-  /urn:schemas-microsoft-com:office:excel|google-sheets-html-origin|LibreOffice|ProgId["']?\s+content=["']?Excel/i
+  /urn:schemas-microsoft-com:office:excel|google-sheets-html-origin|ProgId["']?\s+content=["']?Excel/i
+/** tableflip's own "Copy for Excel", which looks like Excel's but is read as a table. */
+const OWN_COPY = /<meta\s+name=["']?generator["']?\s+content=["']?tableflip/i
 
 /**
  * Picks what to use from a paste. Tables copied from web pages, Word or
@@ -25,7 +28,8 @@ const SPREADSHEET_SOURCE =
  * text. Spreadsheets and plain text are used as they are.
  */
 export function choosePaste(html: string, plain: string): PastedInput {
-  if (html !== "" && SPREADSHEET_SOURCE.test(html.slice(0, 4000))) {
+  const head = html.slice(0, 4000)
+  if (html !== "" && SPREADSHEET_SOURCE.test(head) && !OWN_COPY.test(head)) {
     return {
       text: plain,
       hint: { format: "delimited", delimiter: "\t", spreadsheet: true },

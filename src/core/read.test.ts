@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest"
 import { MAX_INPUT_BYTES, TooMuchDataError } from "./limits"
 import { choosePaste } from "./paste"
 import { detectFormat, readTable } from "./read"
+import { makeTable, toView } from "./table"
+import { excelClipboard } from "./writers/excel"
 
 describe("detectFormat", () => {
   it.each([
@@ -12,6 +14,18 @@ describe("detectFormat", () => {
     ['[\n  {"a": 1}\n]', "json"],
     ['{"a":1}\n{"a":2}', "jsonl"],
     ["[1,2]\n[3,4]", "jsonl"],
+    ["[]", "json"],
+    ["[true, null]", "json"],
+    ["{name: 1}", "json"],
+    ["['a', 'b']", "json"],
+    ["[Tag],[Value]\n[FT-101],42", "delimited"],
+    ["[default]Pump1/Speed,42.5\n[default]Pump2/Speed,40", "delimited"],
+    ["[TRUE],[FALSE]\n1,0", "delimited"],
+    ["{4D36E967-E325-11CE-BFC1-08002BE10318},Ports", "delimited"],
+    ["{id},name\n1,x", "delimited"],
+    ["id|name|score\n1|Ann|5\n-|-|-\n3|Bob|7", "delimited"],
+    ["| a | b |\n|---|\n| 1 | 2 |", "delimited"],
+    ["| a | b |\r\n|---|---|\r\n| 1 | 2 |", "markdown"],
     ["<table><tr><td>x</td></tr></table>", "html"],
     ['<meta charset="utf-8"><table><tr><td>x</td></tr></table>', "html"],
     ["Copied text <table><tr><td>x</td></tr></table>", "html"],
@@ -25,6 +39,12 @@ describe("detectFormat", () => {
     ["", "delimited"],
   ])("%j is %s", (text, format) => {
     expect(detectFormat(text)).toBe(format)
+  })
+
+  it("takes little time on long runs of spaces", () => {
+    const started = performance.now()
+    detectFormat(`${" ".repeat(200_000)}x\n${"\t".repeat(200_000)}x`)
+    expect(performance.now() - started).toBeLessThan(500)
   })
 })
 
@@ -118,5 +138,16 @@ describe("choosePaste", () => {
   it("uses plain text when there's no table", () => {
     expect(choosePaste("<b>bold</b>", "bold")).toEqual({ text: "bold", hint: {}, fromRichTable: false })
     expect(choosePaste("", "a,b")).toEqual({ text: "a,b", hint: {}, fromRichTable: false })
+  })
+
+  it("reads tableflip's own Copy for Excel as a table, keeping every cell", () => {
+    const rows = [
+      ['12" pipe', '"A" phase', "  TT-1"],
+      ["1-2", "line 1\nline 2", '"'],
+    ]
+    const { text, html } = excelClipboard(toView(makeTable(rows, false), false), { keepText: true })
+    const pasted = choosePaste(html!, text)
+    expect(pasted.fromRichTable).toBe(true)
+    expect(readTable(pasted.text, "auto", pasted.hint).table.rows).toEqual(rows)
   })
 })

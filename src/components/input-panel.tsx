@@ -1,5 +1,5 @@
 import { ClipboardPasteIcon, FileUpIcon, LoaderCircleIcon, XIcon } from "lucide-react"
-import { useRef } from "react"
+import { useEffect, useRef } from "react"
 
 import { ErrorMessage } from "@/components/message"
 import { Panel, PanelHeader, PanelTitle } from "@/components/panel"
@@ -27,7 +27,8 @@ interface InputPanelProps {
   pending: boolean
   bytes: number
   textareaRef: React.RefObject<HTMLTextAreaElement | null>
-  onTextChange: (text: string) => void
+  /** `replacedAll` is set when the edit replaced all of the text, as when typing over it. */
+  onTextChange: (text: string, replacedAll: boolean) => void
   onFormatChange: (format: InputFormat | "auto") => void
   onOpenFiles: (files: FileList) => void
   onExample: () => void
@@ -65,6 +66,19 @@ export function InputPanel({
   onDismissActionError,
 }: InputPanelProps) {
   const fileInput = useRef<HTMLInputElement>(null)
+  const replacingAll = useRef(false)
+
+  useEffect(() => {
+    const textarea = textareaRef.current
+    if (!textarea) return
+    // textLength, unlike value, doesn't copy megabytes of text on each keystroke.
+    const onBeforeInput = () => {
+      const length = textarea.textLength
+      replacingAll.current = length > 0 && textarea.selectionStart === 0 && textarea.selectionEnd === length
+    }
+    textarea.addEventListener("beforeinput", onBeforeInput)
+    return () => textarea.removeEventListener("beforeinput", onBeforeInput)
+  }, [textareaRef])
   const empty = text === ""
   const formatLabel = result && INPUT_FORMATS.find((f) => f.id === result.format)?.label
 
@@ -126,7 +140,10 @@ export function InputPanel({
           ref={textareaRef}
           // Not controlled by React: rewriting megabytes of text on every keystroke made typing lag.
           // App sets the value directly when it replaces the input.
-          onChange={(event) => onTextChange(event.target.value)}
+          onChange={(event) => {
+            onTextChange(event.target.value, replacingAll.current)
+            replacingAll.current = false
+          }}
           wrap="off"
           spellCheck={false}
           autoComplete="off"

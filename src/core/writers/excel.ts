@@ -1,5 +1,4 @@
-import type { TableView } from "../table"
-import { writeDelimited } from "./delimited"
+import { allRows, type TableView } from "../table"
 import { excelHtmlRows } from "./html"
 
 export interface ExcelOptions {
@@ -15,9 +14,19 @@ export interface ClipboardPayload {
   html?: string
 }
 
-/** Tab-separated text, the way Excel itself copies cells. */
+/** Marks tableflip's own copies, so pasting one back reads its HTML, which keeps every cell exactly. */
+export const GENERATOR_META = '<meta name="generator" content="tableflip">'
+
+/**
+ * Tab-separated text, the way Excel itself copies cells: only cells with line
+ * breaks are quoted, so an inch mark like 12" stays as it is. Cells with tabs
+ * are quoted too, since a tab would start a new cell.
+ */
 export function writeExcelText(view: TableView): string {
-  return writeDelimited(view, "\t")
+  const cell = (text: string) => (/[\t\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text)
+  return allRows(view)
+    .map((row) => row.map(cell).join("\t"))
+    .join("\r\n")
 }
 
 /**
@@ -28,7 +37,7 @@ export function writeExcelText(view: TableView): string {
 export function excelClipboard(view: TableView, options: ExcelOptions): ClipboardPayload {
   const html = [
     '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">',
-    '<head><meta charset="utf-8"></head>',
+    `<head><meta charset="utf-8">${GENERATOR_META}</head>`,
     `<body><table>${excelHtmlRows(view, options.keepText)}</table></body>`,
     "</html>",
   ].join("")

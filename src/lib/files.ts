@@ -2,7 +2,21 @@ import { assertInputSize, assertTextSize, MAX_INPUT_BYTES, type ReadHint } from 
 
 export const ACCEPTED_FILES = ".csv,.tsv,.txt,.json,.jsonl,.ndjson,.md,.markdown,.html,.htm"
 
-const SPREADSHEET_FILE = /\.(xlsx|xlsm|xlsb|xls|ods|numbers)$/i
+const PICTURE_REFUSAL = "tableflip can't read tables in pictures."
+
+/** Files people try that tableflip can't read, and what to say about them. */
+const REFUSED_FILES: [RegExp, string][] = [
+  [
+    /\.(xlsx|xlsm|xlsb|xls|ods|numbers)$/i,
+    "tableflip can't open spreadsheet files. Select the cells in your spreadsheet, copy them, and paste them here.",
+  ],
+  [
+    /\.(docx|docm|doc|odt|rtf|pages)$/i,
+    "tableflip can't open documents. Select the table in your document, copy it, and paste it here.",
+  ],
+  [/\.pdf$/i, "tableflip can't open PDF files."],
+  [/\.(png|jpe?g|gif|bmp|webp|heic|heif|tiff?|svg)$/i, PICTURE_REFUSAL],
+]
 
 export class FileOpenError extends Error {
   constructor(message: string) {
@@ -52,11 +66,11 @@ export function decodeText(bytes: Uint8Array): string {
 
 /** Reads a dropped or chosen file as text, refusing files tableflip can't use. */
 export async function readTextFile(file: File): Promise<string> {
-  if (SPREADSHEET_FILE.test(file.name)) {
-    throw new FileOpenError(
-      "tableflip can't open spreadsheet files. Select the cells in your spreadsheet, copy them, and paste them here."
-    )
-  }
+  // Pasted screenshots are files too.
+  const refusal = file.type.startsWith("image/")
+    ? PICTURE_REFUSAL
+    : REFUSED_FILES.find(([pattern]) => pattern.test(file.name))?.[1]
+  if (refusal) throw new FileOpenError(refusal)
   // UTF-16 files take two bytes per character, so the text is measured after decoding.
   if (file.size > MAX_INPUT_BYTES * 2) assertInputSize(file.size)
   let bytes: Uint8Array

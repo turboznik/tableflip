@@ -7,10 +7,14 @@ export interface MarkdownOptions {
 }
 
 function escapeCell(text: string): string {
-  return text
-    .replace(/\|/g, "\\|")
-    .replace(/\r\n|\r|\n/g, "<br>")
-    .replace(/\t/g, " ")
+  return (
+    text
+      .replace(/\r\n|\r|\n/g, "<br>")
+      .replace(/\t/g, " ")
+      // A backslash before punctuation would escape it, so it's escaped too: C:\data\|x stays as written.
+      .replace(/\\(?=[!-/:-@[-`{-~])/g, "\\\\")
+      .replace(/\|/g, "\\|")
+  )
 }
 
 /** A GitHub-flavored Markdown table. Tables without a header get "Column N". */

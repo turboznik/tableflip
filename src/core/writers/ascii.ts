@@ -52,23 +52,23 @@ export function writeAscii(view: TableView, options: AsciiOptions): string {
   const rule = ([left, join, right]: [string, string, string]) =>
     left + widths.map((width) => border.horizontal.repeat(width + 2)).join(join) + right
 
+  const lines = [rule(border.top)]
+  // Loops rather than spreading, which overflows the stack for a cell with many thousands of lines.
   const renderRow = (row: string[][], isHeader: boolean) => {
-    const height = Math.max(...row.map((lines) => lines.length))
-    const out: string[] = []
+    let height = 0
+    for (const cell of row) height = Math.max(height, cell.length)
     for (let l = 0; l < height; l++) {
-      const cells = row.map((lines, i) => {
-        const text = lines[l] ?? ""
+      const cells = row.map((cell, i) => {
+        const text = cell[l] ?? ""
         return numeric[i] && !isHeader ? padStart(text, widths[i]) : padEnd(text, widths[i])
       })
-      out.push(`${border.vertical} ${cells.join(` ${border.vertical} `)} ${border.vertical}`)
+      lines.push(`${border.vertical} ${cells.join(` ${border.vertical} `)} ${border.vertical}`)
     }
-    return out
   }
 
-  const lines = [rule(border.top)]
   rows.forEach((row, index) => {
     const isHeader = view.header !== null && index === 0
-    lines.push(...renderRow(row, isHeader))
+    renderRow(row, isHeader)
     if (isHeader && rows.length > 1) lines.push(rule(border.middle))
   })
   lines.push(rule(border.bottom))

@@ -3,7 +3,7 @@ import { readDelimited, type Delimiter } from "./readers/delimited"
 import { readHtml } from "./readers/html"
 import { readJson } from "./readers/json"
 import { readJsonLines } from "./readers/jsonl"
-import { readMarkdown } from "./readers/markdown"
+import { readMarkdown, splitMarkdownRow } from "./readers/markdown"
 import { TableReadError, type ParsedTable } from "./table"
 
 export type InputFormat = "delimited" | "html" | "json" | "jsonl" | "markdown"
@@ -35,9 +35,39 @@ export interface ReadResult {
   delimiter?: Delimiter
 }
 
-const MARKDOWN_DELIMITER_ROW = /^[ \t]*\|?[ \t]*:?-+:?[ \t]*(?:\|[ \t]*:?-+:?[ \t]*)*\|?[ \t]*$/gm
+// Spaces are matched only on one side of each optional pipe: two runs of [ \t]* next to each other
+// can split a long run of spaces in many ways, which made matching take seconds.
+const MARKDOWN_DELIMITER_ROW = /^[ \t]*(?:\|[ \t]*)?:?-+:?[ \t]*(?:\|[ \t]*:?-+:?[ \t]*)*(?:\|[ \t]*)?$/gm
 const HTML_TABLE = /<table[\s>]/i
 const HTML_DOCUMENT = /^<(?:!doctype|html|head|body)[\s>]/i
+/**
+ * How JSON starts: a property name (quoted or not, so near misses still get
+ * JSON's error message) or a list of values. Brackets and braces also start
+ * CSV cells like "[Tag]", "[default]Pump1/Speed" or a GUID, which aren't JSON.
+ */
+const JSON_START = /^(?:\{\s*(?:["'}]|[A-Za-z_$][\w$]*\s*:)|\[\s*(?:[[{"'\]\d-]|(?:true|false|null)\s*[,\]]))/
+
+/** The line before the one that starts at `start`, with its own start. */
+function lineAbove(text: string, start: number): { line: string; start: number } | null {
+  if (start === 0) return null
+  const above = text.lastIndexOf("\n", start - 2) + 1
+  return { line: text.slice(above, start - 1), start: above }
+}
+
+/**
+ * Whether the text has a Markdown table: a header row, then a delimiter row like |---|---| with
+ * as many cells. Pipe-separated data can have a row of dashes too, but not as its second line.
+ */
+function hasMarkdownTable(text: string): boolean {
+  for (const match of text.matchAll(MARKDOWN_DELIMITER_ROW)) {
+    if (!match[0].includes("|")) continue
+    const header = lineAbove(text, match.index)
+    if (!header?.line.includes("|")) continue
+    if (lineAbove(text, header.start)?.line.includes("|")) continue
+    if (splitMarkdownRow(header.line).length === splitMarkdownRow(match[0]).length) return true
+  }
+  return false
+}
 
 function parsesAsJson(text: string): boolean {
   try {
@@ -53,7 +83,7 @@ export function detectFormat(text: string): InputFormat {
   const trimmed = text.trim()
   const start = trimmed[0]
 
-  if (start === "{" || start === "[") {
+  if (JSON_START.test(trimmed)) {
     // JSON Lines: the first line is a complete value and more lines follow.
     const lineEnd = trimmed.indexOf("\n")
     if (lineEnd !== -1 && parsesAsJson(trimmed.slice(0, lineEnd).trim())) {
@@ -66,9 +96,7 @@ export function detectFormat(text: string): InputFormat {
   if (start === "<" && (HTML_TABLE.test(trimmed) || HTML_DOCUMENT.test(trimmed))) return "html"
 
   // Lines of dashes without a "|" are headings or rules, not a table's delimiter row.
-  for (const match of trimmed.matchAll(MARKDOWN_DELIMITER_ROW)) {
-    if (match[0].includes("|")) return "markdown"
-  }
+  if (hasMarkdownTable(trimmed)) return "markdown"
 
   if (HTML_TABLE.test(trimmed) && /<\/t[dh]>/i.test(trimmed)) return "html"
 

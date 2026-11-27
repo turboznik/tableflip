@@ -92,6 +92,23 @@ describe("readDelimited", () => {
     const text = new Array(MAX_CELLS / 20).fill(row).join("\n")
     expect(readDelimited(text).rows).toHaveLength(5000)
   })
+
+  it("doesn't count empty cells at the end of rows toward the limit", () => {
+    const lines = ["Tag,Value,", ...Array.from({ length: 40_000 }, (_, i) => `T-${i},${i},`)]
+    const table = readDelimited(lines.join("\n"))
+    expect(table.columnCount).toBe(2)
+    expect(table.rows).toHaveLength(40_001)
+  })
+
+  it("follows Excel's sep= line", () => {
+    const table = readDelimited("sep=;\r\nTag;Value\r\nFT-101;1,5")
+    expect(table.delimiter).toBe(";")
+    expect(table.rows).toEqual([
+      ["Tag", "Value"],
+      ["FT-101", "1,5"],
+    ])
+    expect(table.headerSuggested).toBe(true)
+  })
 })
 
 describe("readDelimited with spreadsheet text", () => {
@@ -226,6 +243,57 @@ describe("readJson", () => {
     }))
     expect(() => readJson(JSON.stringify(items))).toThrow(TooMuchDataError)
   })
+
+  it("keeps columns in the order they were written, even ones named like numbers", () => {
+    expect(readJson('[{"Region":"North","2024":12,"2023":10}]').rows).toEqual([
+      ["Region", "2024", "2023"],
+      ["North", "12", "10"],
+    ])
+    expect(readJson('{"Tag":["FT-1"],"10":["a"],"2":["b"]}').rows[0]).toEqual(["Tag", "10", "2"])
+  })
+
+  it("keeps every number as written", () => {
+    expect(readJson('[{"id":12345678901234567890,"v":1.50,"e":1e3,"z":-0}]').rows[1]).toEqual([
+      "12345678901234567890",
+      "1.50",
+      "1e3",
+      "-0",
+    ])
+  })
+
+  it("decodes strings and keeps the last of repeated keys in the first one's place", () => {
+    expect(readJson('[{"a":"x\\"y\\u00e9","b":1,"a":2}]').rows).toEqual([
+      ["a", "b"],
+      ["2", "1"],
+    ])
+    expect(readJson('[{"a":"x\\"y\\u00e9"}]').rows[1]).toEqual(['x"yé'])
+  })
+
+  it("reads pandas' split layout with its column names", () => {
+    expect(readJson('{"columns":["Tag","Value"],"index":[0,1],"data":[["FT-1",1],["PT-2",2]]}').rows).toEqual(
+      [
+        ["Tag", "Value"],
+        ["FT-1", "1"],
+        ["PT-2", "2"],
+      ]
+    )
+  })
+
+  it("reads JSON with a byte order mark", () => {
+    expect(readJson('\uFEFF[{"a":1}]').rows).toEqual([["a"], ["1"]])
+  })
+
+  it("gives the browser's message for invalid JSON and refuses deep nesting", () => {
+    let native = ""
+    try {
+      JSON.parse('[{"a":1,}]')
+    } catch (error) {
+      native = (error as Error).message
+    }
+    expect(() => readJson('[{"a":1,}]')).toThrow(native.replace(/^\w/, (c) => c.toUpperCase()))
+    expect(() => readJson('["a\tb"]')).toThrow(/^This isn't valid JSON\./)
+    expect(() => readJson("[".repeat(5000) + "]".repeat(5000))).toThrow("This JSON is nested too deeply.")
+  })
 })
 
 describe("readJsonLines", () => {
@@ -240,6 +308,10 @@ describe("readJsonLines", () => {
 
   it("names the line with invalid JSON", () => {
     expect(() => readJsonLines('{"a":1}\n{"a":')).toThrow(/^Line 2: This isn't valid JSON\./)
+  })
+
+  it("keeps columns in the order they were written", () => {
+    expect(readJsonLines('{"b":1,"1":2}\n{"b":3,"1":4}').rows[0]).toEqual(["b", "1"])
   })
 })
 
@@ -287,5 +359,15 @@ describe("readMarkdown", () => {
   it("splits on pipes inside code spans, like GitHub", () => {
     expect(splitMarkdownRow("| `a|b` | c |")).toEqual(["`a", "b`", "c"])
     expect(splitMarkdownRow("| `a\\|b` | c |")).toEqual(["`a|b`", "c"])
+  })
+
+  it("unescapes backslash escapes and counts backslashes before pipes", () => {
+    expect(splitMarkdownRow(String.raw`| \*x\* | a\_b | C:\data\\\|x | ok |`)).toEqual([
+      "*x*",
+      "a_b",
+      String.raw`C:\data\|x`,
+      "ok",
+    ])
+    expect(splitMarkdownRow(String.raw`| a\\| b |`)).toEqual(["a\\", "b"])
   })
 })
