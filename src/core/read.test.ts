@@ -32,6 +32,11 @@ describe("readTable", () => {
     expect(readTable('[{"a":1}]', "auto").format).toBe("json")
   })
 
+  it("says when a table has no values", () => {
+    expect(() => readTable(",,,\n,,,", "auto")).toThrow("This table is empty.")
+    expect(() => readTable("{}", "auto")).toThrow("This table is empty.")
+  })
+
   it("uses the format it's told", () => {
     expect(readTable('[{"a":1}]', "delimited").table.rows[0]).toEqual(['[{"a":1}]'])
   })

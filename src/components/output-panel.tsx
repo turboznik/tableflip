@@ -1,5 +1,5 @@
 import { DownloadIcon } from "lucide-react"
-import { useMemo } from "react"
+import { memo, useMemo } from "react"
 
 import { CopyButton } from "@/components/copy-button"
 import { ErrorMessage } from "@/components/message"
@@ -22,8 +22,13 @@ import {
 import { downloadText } from "@/lib/download"
 import { cn } from "@/lib/utils"
 
-/** Longer output is cut off on screen; Copy and Download still use all of it. */
-const MAX_DISPLAY_CHARS = 400_000
+/**
+ * Longer output is cut off on screen, because laying out a huge textarea is
+ * slow. Copy and Download still use all of it.
+ */
+const MAX_DISPLAY_CHARS = 100_000
+/** Outputs up to this length are kept, so switching back to a tab is instant. */
+const MAX_CACHED_CHARS = 2_000_000
 
 interface OutputPanelProps {
   view: TableView | null
@@ -38,17 +43,38 @@ interface OutputPanelProps {
 
 type Output = { text: string; error: null } | { text: null; error: string }
 
-export function OutputPanel({ view, format, options, onFormatChange, setOptions, stale, className }: OutputPanelProps) {
+const outputCache = new WeakMap<TableView, Map<OutputFormat, { options: unknown; output: Output }>>()
+
+function write<F extends OutputFormat>(view: TableView, format: F, options: OutputOptions[F]): Output {
+  let cached = outputCache.get(view)
+  const hit = cached?.get(format)
+  if (hit && hit.options === options) return hit.output
+
+  let output: Output
+  try {
+    output = { text: writeTable(view, format, options), error: null }
+  } catch (error) {
+    output = { text: null, error: error instanceof Error ? error.message : String(error) }
+  }
+  if ((output.text?.length ?? 0) <= MAX_CACHED_CHARS) {
+    if (!cached) outputCache.set(view, (cached = new Map()))
+    cached.set(format, { options, output })
+  }
+  return output
+}
+
+export const OutputPanel = memo(function OutputPanel({
+  view,
+  format,
+  options,
+  onFormatChange,
+  setOptions,
+  stale,
+  className,
+}: OutputPanelProps) {
   // Only this format's options matter, so changing another format's settings doesn't rewrite the output.
   const formatOptions = options[format]
-  const output = useMemo<Output | null>(() => {
-    if (!view) return null
-    try {
-      return { text: writeTable(view, format, formatOptions), error: null }
-    } catch (error) {
-      return { text: null, error: error instanceof Error ? error.message : String(error) }
-    }
-  }, [view, format, formatOptions])
+  const output = useMemo(() => (view ? write(view, format, formatOptions) : null), [view, format, formatOptions])
 
   const info = OUTPUT_FORMATS.find((item) => item.id === format)!
   const text = output?.text ?? null
@@ -107,7 +133,14 @@ export function OutputPanel({ view, format, options, onFormatChange, setOptions,
             </>
           )}
           {format !== "excel" && format !== "html" && (
-            <CopyButton label="Copy" variant="default" disabled={!ready} getPayload={() => ({ text: text! })} />
+            // Keyed so a "Copied" from one format doesn't show on the next.
+            <CopyButton
+              key={format}
+              label="Copy"
+              variant="default"
+              disabled={!ready}
+              getPayload={() => ({ text: text! })}
+            />
           )}
           {info.extension && (
             <Button variant="outline" disabled={!ready} onClick={download}>
@@ -136,7 +169,11 @@ export function OutputPanel({ view, format, options, onFormatChange, setOptions,
             wrap="off"
             spellCheck={false}
             aria-label={`${info.label} output`}
-            className="min-h-64 flex-1 resize-none bg-transparent p-3 font-mono text-xs leading-5 outline-none focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:ring-inset"
+            className={cn(
+              "min-h-64 flex-1 resize-none bg-transparent p-3 font-mono text-xs leading-5 outline-none focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:ring-inset",
+              // Box-drawing lines only join up at the font's own line height.
+              format === "ascii" && "leading-[1.3]"
+            )}
           />
         )}
       </div>
@@ -156,4 +193,4 @@ export function OutputPanel({ view, format, options, onFormatChange, setOptions,
       )}
     </Panel>
   )
-}
+})

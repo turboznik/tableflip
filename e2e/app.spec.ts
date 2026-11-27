@@ -328,9 +328,22 @@ test("the drop overlay goes away when a drag leaves", async ({ page }) => {
     transfer.setData("text/plain", "a,b")
     return transfer
   })
+  const overlay = page.getByText("Drop to open")
+  // Moving between elements: the next dragenter comes before the last dragleave.
+  await page.dispatchEvent("main", "dragenter", { dataTransfer: transfer })
+  await page.dispatchEvent("textarea", "dragenter", { dataTransfer: transfer })
+  await page.dispatchEvent("main", "dragleave", { dataTransfer: transfer })
+  await expect(overlay).toBeVisible()
+  // Leaving the window.
+  await page.dispatchEvent("textarea", "dragleave", { dataTransfer: transfer })
+  await expect(overlay).toHaveCount(0)
+
+  // If a leave is missed, the overlay still goes away once dragover stops.
   await page.dispatchEvent("main", "dragover", { dataTransfer: transfer })
-  await expect(page.getByText("Drop to open")).toBeVisible()
-  await expect(page.getByText("Drop to open")).toHaveCount(0, { timeout: 1000 })
+  await expect(overlay).toBeVisible()
+  await page.waitForTimeout(700)
+  await expect(overlay).toBeVisible()
+  await expect(overlay).toHaveCount(0, { timeout: 2000 })
 })
 
 test("large input stays responsive while typing", async ({ page }) => {

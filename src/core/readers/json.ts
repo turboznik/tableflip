@@ -31,7 +31,10 @@ export function parseJson(text: string): unknown {
 
 function jsonErrorDetail(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error)
-  return message.replace(/^JSON\.parse: /, "").replace(/^\w/, (c) => c.toUpperCase())
+  return message
+    .replace(/^JSON\.parse: /, "")
+    .replace(/^\w/, (c) => c.toUpperCase())
+    .replace(/([^.!?])$/, "$1.")
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {

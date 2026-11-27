@@ -56,7 +56,13 @@ export async function readTextFile(file: File): Promise<string> {
     )
   }
   assertInputSize(file.size)
-  const bytes = new Uint8Array(await file.arrayBuffer())
+  let bytes: Uint8Array
+  try {
+    bytes = new Uint8Array(await file.arrayBuffer())
+  } catch {
+    // Folders and files that were moved or deleted after being chosen.
+    throw new FileOpenError("This file couldn't be read.")
+  }
   const text = decodeText(bytes)
   if (text.includes("\u0000")) {
     throw new FileOpenError("This doesn't look like a text file.")

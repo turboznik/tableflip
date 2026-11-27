@@ -4,7 +4,7 @@ import { readHtml } from "./readers/html"
 import { readJson } from "./readers/json"
 import { readJsonLines } from "./readers/jsonl"
 import { readMarkdown } from "./readers/markdown"
-import type { ParsedTable } from "./table"
+import { TableReadError, type ParsedTable } from "./table"
 
 export type InputFormat = "delimited" | "html" | "json" | "jsonl" | "markdown"
 
@@ -66,7 +66,14 @@ export function detectFormat(text: string): InputFormat {
  */
 export function readTable(text: string, format: InputFormat | "auto"): ReadResult {
   assertTextSize(text)
-  const used = format === "auto" ? detectFormat(text) : format
+  const result = readAs(text, format === "auto" ? detectFormat(text) : format)
+  if (result.table.rows.length === 0 || result.table.columnCount === 0) {
+    throw new TableReadError("This table is empty.")
+  }
+  return result
+}
+
+function readAs(text: string, used: InputFormat): ReadResult {
   switch (used) {
     case "delimited": {
       const table = readDelimited(text)

@@ -27,7 +27,7 @@ export const PreviewTable = memo(function PreviewTable({ table, hasHeader }: Pre
           {header && (
             <thead className="sticky top-0 z-10">
               <tr>
-                <th className="sticky left-0 z-10 border-r border-b bg-muted px-2 text-right font-normal text-muted-foreground/60" />
+                <th className="sticky left-0 z-10 w-px border-r border-b bg-muted px-2 text-right font-normal text-muted-foreground/60" />
                 {header.slice(0, columns).map((cell, i) => (
                   <th
                     key={i}
@@ -43,7 +43,7 @@ export const PreviewTable = memo(function PreviewTable({ table, hasHeader }: Pre
           <tbody>
             {body.map((row, r) => (
               <tr key={r} className="hover:bg-muted/40">
-                <td className="sticky left-0 border-r border-b bg-card px-2 text-right text-muted-foreground/60 select-none">
+                <td className="sticky left-0 w-px border-r border-b bg-card px-2 text-right text-muted-foreground/60 select-none">
                   {r + 1}
                 </td>
                 {row.slice(0, columns).map((cell, c) => (

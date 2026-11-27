@@ -94,6 +94,12 @@ export function App() {
   const replaceInput = (text: string, format: InputFormat | "auto", note: string | null = null) => {
     latestAction.current++
     setActionError(null)
+    const textarea = textareaRef.current
+    if (textarea) {
+      textarea.value = text
+      textarea.setSelectionRange(0, 0)
+      textarea.scrollTo(0, 0)
+    }
     setInput((prev) => ({ text, format, revision: prev.revision + 1, typed: false, note }))
   }
 
@@ -166,7 +172,9 @@ export function App() {
   }, [])
 
   useEffect(() => {
-    let hideTimer: ReturnType<typeof setTimeout> | undefined
+    // Counts enters and leaves, since dragenter on the next element fires before dragleave on the last.
+    let depth = 0
+    let fallback: ReturnType<typeof setTimeout> | undefined
     // Drags that start on the page (like moving selected text) keep their normal behavior.
     let internal = false
     const accepts = (event: DragEvent) =>
@@ -174,20 +182,38 @@ export function App() {
       event.dataTransfer !== null &&
       [...event.dataTransfer.types].some((type) => type === "Files" || type === "text/plain" || type === "text/html")
 
+    const hide = () => {
+      depth = 0
+      clearTimeout(fallback)
+      setDragging(false)
+    }
+    const show = () => {
+      setDragging(true)
+      // Browsers fire dragover at least every 550 ms during a drag, so this only runs if a leave was missed.
+      clearTimeout(fallback)
+      fallback = setTimeout(hide, 1500)
+    }
     const onDragStart = () => (internal = true)
     const onDragEnd = () => (internal = false)
+    const onDragEnter = (event: DragEvent) => {
+      if (!accepts(event)) return
+      event.preventDefault()
+      depth++
+      show()
+    }
     const onDragOver = (event: DragEvent) => {
       if (!accepts(event)) return
       event.preventDefault()
       event.dataTransfer!.dropEffect = "copy"
-      setDragging(true)
-      // Browsers keep firing dragover while a drag is over the page, so this hides the overlay once it leaves.
-      clearTimeout(hideTimer)
-      hideTimer = setTimeout(() => setDragging(false), 200)
+      show()
+    }
+    const onDragLeave = (event: DragEvent) => {
+      if (!accepts(event)) return
+      depth = Math.max(0, depth - 1)
+      if (depth === 0) hide()
     }
     const handleDrop = (event: DragEvent) => {
-      clearTimeout(hideTimer)
-      setDragging(false)
+      hide()
       if (!accepts(event)) return
       event.preventDefault()
       onDrop(event.dataTransfer!)
@@ -195,19 +221,25 @@ export function App() {
 
     document.addEventListener("dragstart", onDragStart)
     document.addEventListener("dragend", onDragEnd)
-    window.addEventListener("dragenter", onDragOver)
+    window.addEventListener("dragenter", onDragEnter)
     window.addEventListener("dragover", onDragOver)
+    window.addEventListener("dragleave", onDragLeave)
     window.addEventListener("drop", handleDrop)
     return () => {
-      clearTimeout(hideTimer)
+      clearTimeout(fallback)
       document.removeEventListener("dragstart", onDragStart)
       document.removeEventListener("dragend", onDragEnd)
-      window.removeEventListener("dragenter", onDragOver)
+      window.removeEventListener("dragenter", onDragEnter)
       window.removeEventListener("dragover", onDragOver)
+      window.removeEventListener("dragleave", onDragLeave)
       window.removeEventListener("drop", handleDrop)
     }
   }, [])
 
+  const setHeader = useCallback(
+    (value: boolean) => setHeaderOverride({ revision: input.revision, value }),
+    [input.revision]
+  )
   const setOutputFormat = useCallback(
     (outputFormat: OutputFormat) => setSettings((prev) => ({ ...prev, outputFormat })),
     []
@@ -264,7 +296,7 @@ export function App() {
             className="max-h-96 lg:col-start-1 lg:row-start-2 lg:max-h-none"
             table={table}
             hasHeader={hasHeader}
-            onHeaderChange={(value) => setHeaderOverride({ revision: input.revision, value })}
+            onHeaderChange={setHeader}
             stale={pending}
           />
           <OutputPanel

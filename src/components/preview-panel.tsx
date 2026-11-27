@@ -1,4 +1,4 @@
-import { useId } from "react"
+import { memo, useId } from "react"
 
 import { Panel, PanelHeader, PanelTitle } from "@/components/panel"
 import { PreviewTable } from "@/components/preview-table"
@@ -15,7 +15,13 @@ interface PreviewPanelProps {
   className?: string
 }
 
-export function PreviewPanel({ table, hasHeader, onHeaderChange, stale, className }: PreviewPanelProps) {
+export const PreviewPanel = memo(function PreviewPanel({
+  table,
+  hasHeader,
+  onHeaderChange,
+  stale,
+  className,
+}: PreviewPanelProps) {
   const id = useId()
   const rows = table ? table.rows.length - (hasHeader ? 1 : 0) : 0
 
@@ -53,4 +59,4 @@ export function PreviewPanel({ table, hasHeader, onHeaderChange, stale, classNam
       )}
     </Panel>
   )
-}
+})

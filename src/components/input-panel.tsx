@@ -122,7 +122,8 @@ export function InputPanel({
       <div className="relative flex min-h-40 flex-1 flex-col">
         <textarea
           ref={textareaRef}
-          value={text}
+          // Not controlled by React: rewriting megabytes of text on every keystroke made typing lag.
+          // App sets the value directly when it replaces the input.
           onChange={(event) => onTextChange(event.target.value)}
           wrap="off"
           spellCheck={false}
@@ -162,7 +163,7 @@ export function InputPanel({
             <span>
               {format === "auto" ? "Detected " : "Read as "}
               <span className="font-medium text-foreground">{formatLabel}</span>
-              {result?.delimiter && `, ${DELIMITER_NAMES[result.delimiter]}`}
+              {result?.delimiter && result.table.columnCount > 1 && `, ${DELIMITER_NAMES[result.delimiter]}`}
             </span>
           )}
           {note && <span className="min-w-0 truncate">{formatLabel && "· "}{note}</span>}

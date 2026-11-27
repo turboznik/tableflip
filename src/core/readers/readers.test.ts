@@ -20,6 +20,24 @@ describe("readDelimited", () => {
     expect(table.headerSuggested).toBe(true)
   })
 
+  it("detects tabs in a two-column copy that ends with a line break", () => {
+    const table = readDelimited("Tag\tUnits\r\nTT-103\t°F\r\nPT-102\tpsig\r\n")
+    expect(table.delimiter).toBe("\t")
+    expect(table.columnCount).toBe(2)
+  })
+
+  it("prefers the delimiter that splits rows consistently", () => {
+    const table = readDelimited("Tag\tDescription\nFT-101\tFeed water, flow\nPT-102\tDrum, pressure, steam")
+    expect(table.delimiter).toBe("\t")
+    expect(table.rows[2]).toEqual(["PT-102", "Drum, pressure, steam"])
+  })
+
+  it("keeps one column when nothing splits it consistently", () => {
+    const table = readDelimited("Description\nFeed water, flow\nDrum level\nSteam temperature\n")
+    expect(table.columnCount).toBe(1)
+    expect(table.rows[1]).toEqual(["Feed water, flow"])
+  })
+
   it("detects commas, semicolons and pipes", () => {
     expect(readDelimited("a,b\n1,2").delimiter).toBe(",")
     expect(readDelimited("a;b\n1;2").delimiter).toBe(";")
